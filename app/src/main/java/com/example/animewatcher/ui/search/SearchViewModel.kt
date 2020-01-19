@@ -6,8 +6,7 @@ import androidx.lifecycle.ViewModel
 
 class SearchViewModel : ViewModel() {
 
-    private val _text = MutableLiveData<String>().apply {
-        value = "Enter title here"
+    val text = MutableLiveData<String>().apply {
+        value = ""
     }
-    val text: LiveData<String> = _text
 }

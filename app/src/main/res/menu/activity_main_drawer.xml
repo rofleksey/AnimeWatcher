@@ -7,24 +7,15 @@
         <item
             android:id="@+id/nav_search"
             android:icon="@drawable/ic_menu_camera"
-            android:title="@string/menu_home" />
+            android:title="@string/menu_search" />
         <item
             android:id="@+id/nav_tools"
             android:icon="@drawable/ic_menu_manage"
             android:title="@string/menu_tools" />
     </group>
 
-    <item android:title="Misc">
-<!--        <menu>-->
-<!--            <item-->
-<!--                android:id="@+id/nav_share"-->
-<!--                android:icon="@drawable/ic_menu_share"-->
-<!--                android:title="@string/menu_share" />-->
-<!--            <item-->
-<!--                android:id="@+id/nav_send"-->
-<!--                android:icon="@drawable/ic_menu_send"-->
-<!--                android:title="@string/menu_send" />-->
-<!--        </menu>-->
-    </item>
+    <group android:id="@+id/anime_group">
+
+    </group>
 
 </menu>

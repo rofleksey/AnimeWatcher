@@ -1,9 +1,9 @@
 package com.example.animewatcher.api.provider
 
-import com.example.animewatcher.api.TitleInfo
+import com.example.animewatcher.api.model.TitleInfo
 
-class PaheTitleResponse(val data: List<PaheTitleEntry>) {
+data class PaheTitleResponse(val data: List<PaheTitleEntry>?) {
     fun toTitleInfo(): List<TitleInfo> {
-        return data.map { it.toTitleInfo() }
+        return data?.map { it.toTitleInfo() } ?: listOf()
     }
 }

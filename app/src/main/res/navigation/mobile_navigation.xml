@@ -8,7 +8,7 @@
     <fragment
         android:id="@+id/nav_search"
         android:name="com.example.animewatcher.ui.search.SearchFragment"
-        android:label="@string/menu_home"
+        android:label="@string/menu_search"
         tools:layout="@layout/fragment_search" />
 
     <fragment

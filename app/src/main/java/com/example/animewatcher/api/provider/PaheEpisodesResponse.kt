@@ -1,10 +1,9 @@
 package com.example.animewatcher.api.provider
 
-import com.example.animewatcher.api.EpisodeInfo
-import com.example.animewatcher.api.TitleInfo
+import com.example.animewatcher.api.model.EpisodeInfo
 
-class PaheEpisodesResponse(val data: List<PaheEpisodeEntry>) {
+data class PaheEpisodesResponse(val data: List<PaheEpisodeEntry>?) {
     fun toEpisodeInfo(): List<EpisodeInfo> {
-        return data.map { it.toEpisodeInfo() }
+        return data?.map { it.toEpisodeInfo() } ?: listOf()
     }
 }
