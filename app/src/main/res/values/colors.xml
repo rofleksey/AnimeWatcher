@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <color name="colorPrimary">#008577</color>
     <color name="colorPrimaryDark">#00574B</color>
     <color name="colorAccent">#D81B60</color>
     <color name="colorBlack">#000000</color>
     <color name="colorWhite">#FFFFFF</color>
-    <color name="colorWhiteTransparent">#88FFFFFF</color>
+    <color name="colorWhiteTransparent">#CCFFFFFF</color>
     <color name="colorBackground">#282C38</color>
     <color name="colorPanel">#1F232E</color>
     <color name="colorBar">#1F2531</color>
@@ -14,4 +14,5 @@
     <color name="colorDetails">#6C515F</color>
     <color name="colorLightGray">#B7BBC6</color>
     <color name="colorHighlight">#7C899A</color>
+    <color name="design_snackbar_background_color" tools:override="true">@color/colorAccent</color>
 </resources>

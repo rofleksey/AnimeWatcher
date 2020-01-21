@@ -28,17 +28,20 @@ import com.example.animewatcher.api.provider.ProviderFactory
 import com.example.animewatcher.storage.TitleStorage
 import com.example.animewatcher.storage.TitleStorageEntry
 import com.example.animewatcher.util.Debounce
+import com.example.animewatcher.util.Util.Companion.toast
 import com.github.ybq.android.spinkit.SpinKitView
+import com.mikepenz.iconics.view.IconicsImageButton
 import jp.wasabeef.recyclerview.animators.LandingAnimator
 import kotlinx.coroutines.*
 import kotlin.collections.ArrayList
+import kotlin.system.measureTimeMillis
 
 
 class SearchActivity : AppCompatActivity() {
     private companion object {
-        val CROSSFADE_DURATION = 500
-        val SEARCH_DELAY = 350L
-        val ITEM_MARGIN = 30
+        const val CROSSFADE_DURATION = 500
+        const val SEARCH_DELAY = 350L
+        const val ITEM_MARGIN = 30
     }
 
     private lateinit var sharedPreferences: SharedPreferences
@@ -49,8 +52,8 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var layoutManager: RecyclerView.LayoutManager
     private lateinit var adapter: TitleAdapter
     private lateinit var searchView: EditText
-    private lateinit var buttonBack: View
-    private lateinit var buttonSearch: View
+    private lateinit var buttonBack: IconicsImageButton
+    private lateinit var buttonProviders: IconicsImageButton
 
     private lateinit var titleStorage: TitleStorage
     private lateinit var provider: AnimeProvider
@@ -67,7 +70,10 @@ class SearchActivity : AppCompatActivity() {
         setContentView(R.layout.activity_search)
 
         sharedPreferences = getSharedPreferences("animewatcher", Context.MODE_PRIVATE)
-        titleStorage = TitleStorage.load(sharedPreferences)
+        val storageMeasure = measureTimeMillis {
+            titleStorage = TitleStorage.load(sharedPreferences)
+        }
+        println("titleStorage loaded in $storageMeasure ms")
         imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
 
         providerName = sharedPreferences.getString("provider", ProviderFactory.ANIMEPAHE) ?: ProviderFactory.ANIMEPAHE
@@ -79,7 +85,7 @@ class SearchActivity : AppCompatActivity() {
         ) as ViewGroup
         searchView = barViewGroup.findViewById(R.id.input_field)
         buttonBack = barViewGroup.findViewById(R.id.button_back)
-        buttonSearch = barViewGroup.findViewById(R.id.button_provider)
+        buttonProviders = barViewGroup.findViewById(R.id.button_provider)
         supportActionBar?.setDisplayShowTitleEnabled(false)
         val layout = ActionBar.LayoutParams(
             ActionBar.LayoutParams.MATCH_PARENT,
@@ -87,6 +93,10 @@ class SearchActivity : AppCompatActivity() {
         )
         supportActionBar?.setCustomView(barViewGroup, layout)
         supportActionBar?.setDisplayShowCustomEnabled(true)
+
+        searchView.requestFocus()
+        searchView.setText("Search on $providerName")
+
         buttonBack.setOnClickListener {
             searchDebounces.stop()
             job?.cancel()
@@ -120,7 +130,7 @@ class SearchActivity : AppCompatActivity() {
                             if (!isActive) {
                                 return@launch
                             }
-                            val diff = withContext(Dispatchers.IO) {
+                            val diff = withContext(Dispatchers.Default) {
                                 DiffUtil.calculateDiff(object : DiffUtil.Callback() {
                                     override fun areItemsTheSame(
                                         oldPos: Int,
@@ -155,6 +165,9 @@ class SearchActivity : AppCompatActivity() {
             }
 
         })
+        buttonProviders.setOnClickListener {
+            toast(this, "Animepahe is the only provider (not yet implemented)")
+        }
 
         loadingView = findViewById(R.id.loading)
 
@@ -180,6 +193,12 @@ class SearchActivity : AppCompatActivity() {
         recyclerView.layoutManager = layoutManager
         adapter = TitleAdapter(titleData)
         recyclerView.adapter = adapter
+    }
+
+    override fun onDestroy() {
+        searchDebounces.stop()
+        job?.cancel()
+        super.onDestroy()
     }
 
     private class TitleViewHolder(
@@ -235,8 +254,8 @@ class SearchActivity : AppCompatActivity() {
                             titleStorage.update {
                                 it.add(TitleStorageEntry(data[pos], providerName))
                                 it.sort()
-                                searchView.setText("")
                             }
+                            toast(this@SearchActivity, "Added '$title' to watch list")
                             adapter.notifyItemChanged(pos)
                         }
                         negativeButton(text = "No")

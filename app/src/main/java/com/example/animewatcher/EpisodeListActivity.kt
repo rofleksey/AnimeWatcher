@@ -15,9 +15,11 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.ActionBar
 import androidx.core.net.toUri
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.afollestad.materialdialogs.MaterialDialog
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
@@ -34,21 +36,24 @@ import com.example.animewatcher.util.Util.Companion.sanitizeForFileName
 import jp.wasabeef.recyclerview.animators.LandingAnimator
 import kotlinx.coroutines.*
 import java.lang.Exception
-import java.util.*
 import kotlin.collections.ArrayList
 import com.example.animewatcher.util.Util.Companion.toast
 import com.github.ybq.android.spinkit.SpinKitView
+import com.google.android.material.snackbar.Snackbar
+import java.util.*
 
 class EpisodeListActivity : AppCompatActivity() {
     companion object {
-        private val CROSSFADE_DURATION = 500
-        private val ITEM_MARGIN = 25
-        val ARG = "titleName"
+        private const val CROSSFADE_DURATION = 500
+        private const val ITEM_MARGIN = 25
+        private const val COLUMN_COUNT = 3
+        const val ARG = "titleName"
     }
 
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var downloadManager: DownloadManager
 
+    private lateinit var refreshLayout: SwipeRefreshLayout
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutManager: RecyclerView.LayoutManager
     private lateinit var adapter: EpisodeAdapter
@@ -57,7 +62,11 @@ class EpisodeListActivity : AppCompatActivity() {
     private lateinit var provider: AnimeProvider
     private lateinit var providerName: String
     private lateinit var titleStorage: TitleStorage
-    private val episodeData = ArrayList<EpisodeInfo>()
+
+    private var lastEpisodeNumber: Int = -1
+    private var snackbar: Snackbar? = null
+    private val episodeData: ArrayList<EpisodeInfo> = ArrayList()
+    private var refreshData: ArrayList<EpisodeInfo>? = null
     private var job: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
@@ -87,6 +96,45 @@ class EpisodeListActivity : AppCompatActivity() {
         supportActionBar?.setCustomView(barViewGroup, layout)
         supportActionBar?.setDisplayShowCustomEnabled(true)
 
+        refreshLayout = findViewById(R.id.refresh_layout)
+        refreshLayout.setOnRefreshListener {
+            if (refreshData == null) {
+                return@setOnRefreshListener
+            }
+            job?.cancel()
+            job = coroutineScope.launch {
+                val result = withContext(Dispatchers.Default) {
+                    DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                        override fun areItemsTheSame(
+                            oldPos: Int,
+                            newPos: Int
+                        ): Boolean = episodeData[oldPos].id == refreshData!![newPos].id
+
+                        override fun getOldListSize(): Int = episodeData.size
+
+                        override fun getNewListSize(): Int = refreshData!!.size
+
+                        override fun areContentsTheSame(
+                            oldPos: Int,
+                            newPos: Int
+                        ): Boolean = episodeData[oldPos] == refreshData!![newPos]
+
+                    })
+                }
+                episodeData.clear()
+                episodeData.addAll(refreshData!!)
+                titleEntry.cachedEpisodeList.clear()
+                titleEntry.cachedEpisodeList.addAll(refreshData!!)
+                titleStorage.save()
+                refreshData = null
+                result.dispatchUpdatesTo(adapter)
+                snackbar?.dismiss()
+                refreshLayout.isRefreshing = false
+                refreshLayout.isEnabled = false
+            }
+        }
+        refreshLayout.isEnabled = false
+
         recyclerView = findViewById(R.id.recycler_view)
         recyclerView.itemAnimator = LandingAnimator()
         recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
@@ -97,29 +145,71 @@ class EpisodeListActivity : AppCompatActivity() {
                 state: RecyclerView.State
             ) {
                 val pos = parent.getChildAdapterPosition(view)
-                if (pos >= 1) {
+                if (pos >= COLUMN_COUNT) {
                     outRect.top = ITEM_MARGIN
                 }
-                if (pos < parent.childCount - 1) {
+                if (pos < parent.childCount - COLUMN_COUNT) {
                     outRect.bottom = ITEM_MARGIN
                 }
+                outRect.left = ITEM_MARGIN
+                outRect.right = ITEM_MARGIN
             }
         })
-        layoutManager = LinearLayoutManager(this)
+        layoutManager = GridLayoutManager(this, COLUMN_COUNT, RecyclerView.VERTICAL, false)
         recyclerView.layoutManager = layoutManager
         adapter = EpisodeAdapter(episodeData)
         recyclerView.adapter = adapter
 
+        snackbar = Snackbar.make(refreshLayout, "Refreshing...", Snackbar.LENGTH_INDEFINITE).also { it.show() }
+        snackbar?.setBackgroundTint(resources.getColor(R.color.colorPanel))
+
         job = coroutineScope.launch {
             try {
-                val episodes = withContext(Dispatchers.IO) {
-                    provider.getAllEpisodes(titleEntry.info.title)
+                val firstTime = titleEntry.lastEpisodeNumber == -1
+                val episodes = if (firstTime) {
+                    withContext(Dispatchers.IO) {
+                        provider.getAllEpisodes(titleEntry.info.title)
+                    }
+                } else {
+                    titleEntry.cachedEpisodeList
                 }
-                episodeData.clear()
+                println("titleEntry.lastEpisodeNumber = ${titleEntry.lastEpisodeNumber}")
                 episodeData.addAll(episodes)
-                adapter.notifyDataSetChanged()
+                if (firstTime) {
+                    titleEntry.cachedEpisodeList.addAll(episodes)
+                    titleEntry.lastEpisodeNumber = episodeData.size
+                }
+                lastEpisodeNumber = titleEntry.lastEpisodeNumber
+                titleEntry.lastEpisodeNumber = episodes.size
+                titleStorage.save()
+                if (!isActive) {
+                    return@launch
+                }
+                adapter.notifyItemRangeInserted(0, episodeData.size)
+                if (!firstTime) {
+                    val newEpisodes = withContext(Dispatchers.IO) {
+                        provider.getAllEpisodes(titleEntry.info.title)
+                    }
+                    if (!isActive) {
+                        return@launch
+                    }
+                    val equals = withContext(Dispatchers.Default) {
+                        newEpisodes == episodeData
+                    }
+                    if (!equals) {
+                        refreshData = ArrayList(newEpisodes)
+                        snackbar = Snackbar.make(refreshLayout, "Swipe down to refresh", Snackbar.LENGTH_INDEFINITE).also { it.show() }
+                        refreshLayout.isEnabled = true
+                    } else {
+                        snackbar?.dismiss()
+                    }
+                } else {
+                    snackbar?.dismiss()
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+
             }
         }
     }
@@ -140,7 +230,9 @@ class EpisodeListActivity : AppCompatActivity() {
                 downloadRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 downloadRequest.setVisibleInDownloadsUi(true)
                 downloadRequest.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, sanitizeForFileName(downloadTitle))
-                downloadManager.enqueue(downloadRequest)
+                val taskId = downloadManager.enqueue(downloadRequest)
+//                titleEntry.downloadTasks[number] = taskId
+//                titleStorage.save()
                 toast(context, description)
             }
         }
@@ -183,7 +275,7 @@ class EpisodeListActivity : AppCompatActivity() {
             Glide
                 .with(this@EpisodeListActivity)
                 .load(data[pos].image)
-                .apply(RequestOptions.circleCropTransform())
+                //.apply(RequestOptions.circleCropTransform())
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
             val number = data[pos].num

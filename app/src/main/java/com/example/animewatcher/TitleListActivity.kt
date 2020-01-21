@@ -34,8 +34,8 @@ import kotlin.collections.ArrayList
 
 class TitleListActivity : AppCompatActivity() {
     companion object {
-        private val CROSSFADE_DURATION = 500
-        private val ITEM_MARGIN = 25
+        private const val CROSSFADE_DURATION = 500
+        private const val ITEM_MARGIN = 25
     }
 
     private lateinit var sharedPreferences: SharedPreferences
@@ -45,7 +45,7 @@ class TitleListActivity : AppCompatActivity() {
     private lateinit var layoutManager: RecyclerView.LayoutManager
     private lateinit var adapter: TitleEntryAdapter
     //TODO: IconicsImageButton?
-    private lateinit var searchButton: IconicsImageView
+    private lateinit var searchButton: IconicsImageButton
 
     private lateinit var titleStorage: TitleStorage
 
@@ -58,7 +58,7 @@ class TitleListActivity : AppCompatActivity() {
         setContentView(R.layout.activity_title_list)
 
         sharedPreferences = getSharedPreferences("animewatcher", Context.MODE_PRIVATE)
-        sharedPreferences.edit().clear().commit()
+        //sharedPreferences.edit().clear().commit()
         titleStorage = TitleStorage.load(sharedPreferences)
         imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
 
@@ -116,6 +116,11 @@ class TitleListActivity : AppCompatActivity() {
             .check()
     }
 
+    override fun onDestroy() {
+        job?.cancel()
+        super.onDestroy()
+    }
+
     override fun onResume() {
         super.onResume()
         titleStorage = TitleStorage.load(sharedPreferences)
@@ -163,7 +168,9 @@ class TitleListActivity : AppCompatActivity() {
             holder.name.text = title
             holder.details.text = data[pos].provider
             holder.view.setOnClickListener {
-
+                val episodesIntent = Intent(this@TitleListActivity, EpisodeListActivity::class.java)
+                episodesIntent.putExtra(EpisodeListActivity.ARG, title)
+                startActivity(episodesIntent)
             }
         }
 

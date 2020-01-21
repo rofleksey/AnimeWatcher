@@ -4,30 +4,34 @@ import android.content.SharedPreferences
 import com.example.animewatcher.api.model.TitleInfo
 import com.google.gson.Gson
 
-class TitleStorage private constructor(@Transient val prefs: SharedPreferences) {
+class TitleStorage private constructor(val prefs: SharedPreferences) {
     companion object {
         fun load(prefs: SharedPreferences): TitleStorage {
-            val json = prefs.getString("titles", null)
-            if (json != null) {
-                return Gson().fromJson<TitleStorage>(json, TitleStorage::class.java)
-            }
-            return TitleStorage(prefs)
+            return TitleStorage(prefs).also { it.reload() }
         }
     }
 
-    private val _entryList = ArrayList<TitleStorageEntry>()
-    val entryList: ArrayList<TitleStorageEntry>
-        get() = ArrayList(_entryList)
-    val infoList: List<TitleInfo>
-        get() = _entryList.map { it.info }
+    private val data: TitleStorageData = TitleStorageData(ArrayList<TitleStorageEntry>())
+    private val gson = Gson()
 
-    @Transient
-    val gson = Gson()
+    val entryList: ArrayList<TitleStorageEntry>
+        get() = data.entryList
+
+    val infoList: List<TitleInfo>
+        get() = entryList.map { it.info }
+
+    fun reload() {
+        val json = prefs.getString("title_storage", null)
+        if (json != null) {
+            val otherData = Gson().fromJson<TitleStorageData>(json, TitleStorageData::class.java)
+            data.entryList.clear()
+            data.entryList.addAll(otherData.entryList)
+        }
+    }
 
     fun save() {
-        val json = gson.toJson(this)
-        println(json)
-        prefs.edit().putString("titles", json).apply()
+        val json = gson.toJson(data)
+        prefs.edit().putString("title_storage", json).apply()
     }
 
     @Throws(NoSuchElementException::class)
@@ -38,7 +42,9 @@ class TitleStorage private constructor(@Transient val prefs: SharedPreferences) 
     }
 
     fun update(func: (ArrayList<TitleStorageEntry>) -> Unit) {
-        func(_entryList)
+        func(entryList)
         save()
     }
+
+    private class TitleStorageData(val entryList: ArrayList<TitleStorageEntry>)
 }
