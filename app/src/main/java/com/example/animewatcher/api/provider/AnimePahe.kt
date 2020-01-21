@@ -10,6 +10,7 @@ import com.example.animewatcher.api.util.SimpleCache
 import com.example.animewatcher.api.util.actualBody
 import com.google.gson.Gson
 import com.google.gson.JsonParser
+import org.jsoup.Jsoup
 
 class AnimePahe : AnimeProvider {
     companion object {
@@ -18,6 +19,7 @@ class AnimePahe : AnimeProvider {
     }
 
     private val httpHandler = HttpHandler()
+    private val allAnimeCache = SimpleCache<List<String>>()
     private val searchCache = SimpleCache<List<TitleInfo>>()
     private val episodesCache = SimpleCache<List<EpisodeInfo>>()
     private val storageCache = SimpleCache<Map<Quality, String>>()
@@ -37,7 +39,11 @@ class AnimePahe : AnimeProvider {
     }
 
     override suspend fun getEpisodeList(title: String, page: Int): List<EpisodeInfo> {
-        val searchResult = searchExact(title) ?: return listOf()
+        val searchResult = searchExact(title)
+        if (searchResult == null) {
+            println("exact search failed: $title")
+            return listOf()
+        }
         return httpHandler.execute({
             this.scheme("https")
                 .host(HOST)
@@ -53,8 +59,12 @@ class AnimePahe : AnimeProvider {
         }, episodesCache, title, page)
     }
 
-    override suspend fun getStorageLink(title: String, episode: Int): Map<Quality, String> {
-        val episodeResult = getExactEpisode(title, episode) ?: return mapOf()
+    override suspend fun getStorageLinks(title: String, episode: Int): Map<Quality, String> {
+        val episodeResult = getExactEpisode(title, episode)
+        if (episodeResult == null) {
+            println("get exact episode failed: $title::$episode")
+            return mapOf()
+        }
         val episodeId = episodeResult.id.toString()
         return httpHandler.execute({
             this.scheme("https")
@@ -81,6 +91,19 @@ class AnimePahe : AnimeProvider {
             }
             links
         }, storageCache, title, episode)
+    }
+
+    override suspend fun getAllTitles(): List<String>? {
+        return httpHandler.execute({
+            this.scheme("https")
+                .host(HOST)
+                .addPathSegment("anime")
+        }, { this }, {
+            val doc = Jsoup.parse(this.actualBody())
+            doc.select(".tab-content li").map {
+                it.text()
+            }
+        }, allAnimeCache)
     }
 
     override fun stats(): ProviderStats {

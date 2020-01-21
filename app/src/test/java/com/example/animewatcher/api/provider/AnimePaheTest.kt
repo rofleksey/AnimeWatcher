@@ -6,8 +6,6 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.TestInstance
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AnimePaheTest {
@@ -53,9 +51,21 @@ class AnimePaheTest {
 
     @Test
     fun storageLink() {
-        val map = runBlocking { pahe.getStorageLink("Hunter x Hunter (2011)", 148) }
+        val map = runBlocking { pahe.getStorageLinks("Hunter x Hunter (2011)", 148) }
         assertFalse(map.isEmpty())
         assertTrue(map.containsKey(Quality.q720))
         assertEquals("https://kwik.cx/e/7nbfAA7aJyf1", map[Quality.q720])
+    }
+
+    @Test
+    fun allTitles() {
+        val list = runBlocking { pahe.getAllTitles() }
+        if (list != null) {
+            println(list)
+            assertTrue(list.size >= 184)
+            assertTrue(list.contains("Bleach"))
+        } else {
+            fail("didn't return anything!")
+        }
     }
 }

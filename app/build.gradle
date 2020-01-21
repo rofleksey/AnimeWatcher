@@ -32,7 +32,7 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
-    implementation"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'androidx.core:core-ktx:1.1.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
@@ -55,8 +55,18 @@ dependencies {
     implementation 'org.riversun:okhttp3-cookie-helper:1.0.0'
     implementation 'com.github.bumptech.glide:glide:4.11.0'
     implementation 'com.afollestad.material-dialogs:core:3.1.1'
+    implementation "com.mikepenz:iconics-core:4.0.2"
+    implementation "com.mikepenz:iconics-views:4.0.2"
+    implementation 'com.mikepenz:community-material-typeface:3.7.95.3-kotlin@aar'
+    implementation 'jp.wasabeef:recyclerview-animators:3.0.0'
+    implementation 'com.karumi:dexter:6.0.1'
+    implementation 'com.github.ybq:Android-SpinKit:1.4.0'
 
     annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
+
+    implementation "com.mikepenz:materialdrawer:7.0.0"
+    implementation "androidx.annotation:annotation:1.1.0"
+    implementation "com.mikepenz:materialdrawer-nav:7.0.0"
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.5.2'
     //testImplementation 'org.mockito:mockito-core:3.2.4'

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="horizontal"
+    android:gravity="right|center_vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.mikepenz.iconics.view.IconicsImageView
+        android:id="@+id/button_search"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginRight="15dp"
+        android:layout_weight="0"
+        app:iiv_color="@color/colorWhite"
+        app:iiv_icon="cmd-magnify" />
+
+</LinearLayout>

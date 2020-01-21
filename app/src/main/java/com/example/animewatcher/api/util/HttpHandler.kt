@@ -15,7 +15,7 @@ class HttpHandler {
 
     suspend fun <T> execute(urlProcessor: HttpUrl.Builder.() -> HttpUrl.Builder,
                     requestProcessor: Request.Builder.() -> Request.Builder,
-                    responseProcessor: Response.() -> T, cache: SimpleCache<T>, s: String,
+                    responseProcessor: Response.() -> T, cache: SimpleCache<T>, s: String = "",
                     ii: Int = 0): T {
         val cacheHit = cache.get(s, ii)
         if (cacheHit != null) {
