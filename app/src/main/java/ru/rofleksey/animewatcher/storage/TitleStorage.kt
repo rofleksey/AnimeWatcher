@@ -1,9 +1,9 @@
 package ru.rofleksey.animewatcher.storage
 
 import android.content.SharedPreferences
-import ru.rofleksey.animewatcher.api.model.TitleInfo
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import ru.rofleksey.animewatcher.api.model.TitleInfo
 
 class TitleStorage private constructor(val prefs: SharedPreferences) {
     companion object {
@@ -19,7 +19,6 @@ class TitleStorage private constructor(val prefs: SharedPreferences) {
 
     private val data: TitleStorageData = TitleStorageData(ArrayList())
     private val gson = getGson()
-
 
 
     val entryList: ArrayList<TitleStorageEntry>

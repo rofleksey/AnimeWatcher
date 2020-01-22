@@ -9,14 +9,16 @@ class ProviderFactory {
         val ANIMEPAHE = "animepahe"
         @Throws(NoSuchElementException::class)
         fun get(name: String): AnimeProvider {
-            return when(name) {
+            return when (name) {
                 ANIMEPAHE -> AnimePahe()
                 else -> throw NoSuchElementException("Invalid anime provider")
             }
         }
 
-        suspend fun init(context: Context, prefs: SharedPreferences,
-                         updateStatus: (title: String) -> Unit) {
+        suspend fun init(
+            context: Context, prefs: SharedPreferences,
+            updateStatus: (title: String) -> Unit
+        ) {
             AnimePahe().init(context, prefs, updateStatus)
         }
     }

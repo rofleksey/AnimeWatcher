@@ -1,12 +1,18 @@
 package ru.rofleksey.animewatcher.api.model
 
-class TitleInfo(val title: String, val details: String, val image: String?, val fields: MutableMap<String, String> = HashMap()) : Comparable<TitleInfo> {
+class TitleInfo(
+    val title: String,
+    val details: String,
+    val image: String?,
+    val fields: MutableMap<String, String> = HashMap()
+) : Comparable<TitleInfo> {
     override fun compareTo(other: TitleInfo): Int {
         return title.compareTo(other.title)
     }
 
     operator fun get(name: String): String {
-        return fields[name] ?: throw NoSuchElementException("TitleInfo doesn't contain field '$name'")
+        return fields[name]
+            ?: throw NoSuchElementException("TitleInfo doesn't contain field '$name'")
     }
 
     operator fun set(name: String, value: String) {

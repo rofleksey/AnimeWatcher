@@ -1,12 +1,10 @@
 package ru.rofleksey.animewatcher
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Rect
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -15,23 +13,23 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.ActionBar
+import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.afollestad.materialdialogs.MaterialDialog
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.github.ybq.android.spinkit.SpinKitView
+import com.mikepenz.iconics.view.IconicsImageButton
+import jp.wasabeef.recyclerview.animators.ScaleInAnimator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
 import ru.rofleksey.animewatcher.storage.TitleStorage
 import ru.rofleksey.animewatcher.storage.TitleStorageEntry
 import ru.rofleksey.animewatcher.util.Util
-import com.github.ybq.android.spinkit.SpinKitView
-import com.karumi.dexter.Dexter
-import com.karumi.dexter.listener.PermissionDeniedResponse
-import com.karumi.dexter.listener.single.BasePermissionListener
-import com.mikepenz.iconics.view.IconicsImageButton
-import jp.wasabeef.recyclerview.animators.ScaleInAnimator
-import kotlinx.coroutines.*
-import kotlin.collections.ArrayList
 
 class TitleListActivity : AppCompatActivity() {
     companion object {
@@ -194,7 +192,7 @@ class TitleListActivity : AppCompatActivity() {
                             it.remove(item)
                         }
                         titleData.remove(item)
-                        Util.toast(this@TitleListActivity,"'$title' removed")
+                        Util.toast(this@TitleListActivity, "'$title' removed")
                         adapter.notifyItemRemoved(holder.adapterPosition)
                     }
                     negativeButton(text = "No")

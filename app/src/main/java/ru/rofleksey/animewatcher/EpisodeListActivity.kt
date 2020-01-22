@@ -6,7 +6,6 @@ import android.app.DownloadManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Rect
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
 import android.view.LayoutInflater
@@ -15,6 +14,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.ActionBar
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
@@ -24,6 +24,15 @@ import com.afollestad.materialdialogs.MaterialDialog
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions.bitmapTransform
+import com.github.ybq.android.spinkit.SpinKitView
+import com.google.android.material.snackbar.Snackbar
+import com.karumi.dexter.Dexter
+import com.karumi.dexter.listener.PermissionDeniedResponse
+import com.karumi.dexter.listener.PermissionGrantedResponse
+import com.karumi.dexter.listener.single.BasePermissionListener
+import jp.wasabeef.glide.transformations.BlurTransformation
+import jp.wasabeef.recyclerview.animators.LandingAnimator
+import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
 import ru.rofleksey.animewatcher.api.model.Quality
@@ -33,19 +42,7 @@ import ru.rofleksey.animewatcher.storage.TitleStorage
 import ru.rofleksey.animewatcher.storage.TitleStorageEntry
 import ru.rofleksey.animewatcher.util.Util.Companion.openInVlc
 import ru.rofleksey.animewatcher.util.Util.Companion.sanitizeForFileName
-import jp.wasabeef.recyclerview.animators.LandingAnimator
-import kotlinx.coroutines.*
-import java.lang.Exception
-import kotlin.collections.ArrayList
 import ru.rofleksey.animewatcher.util.Util.Companion.toast
-import com.github.ybq.android.spinkit.SpinKitView
-import com.google.android.material.snackbar.Snackbar
-import com.karumi.dexter.Dexter
-import com.karumi.dexter.listener.PermissionDeniedResponse
-import com.karumi.dexter.listener.PermissionGrantedResponse
-import com.karumi.dexter.listener.single.BasePermissionListener
-import jp.wasabeef.glide.transformations.BlurTransformation
-import ru.rofleksey.animewatcher.util.Util
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -173,7 +170,8 @@ class EpisodeListActivity : AppCompatActivity() {
         adapter = EpisodeAdapter(episodeData)
         recyclerView.adapter = adapter
 
-        snackbar = Snackbar.make(refreshLayout, "Refreshing...", Snackbar.LENGTH_INDEFINITE).also { it.show() }
+        snackbar = Snackbar.make(refreshLayout, "Refreshing...", Snackbar.LENGTH_INDEFINITE)
+            .also { it.show() }
         snackbar?.setBackgroundTint(resources.getColor(R.color.colorPanel))
 
         Glide
@@ -220,7 +218,11 @@ class EpisodeListActivity : AppCompatActivity() {
                     }
                     if (!equals) {
                         refreshData = ArrayList(newEpisodes)
-                        snackbar = Snackbar.make(refreshLayout, "Swipe down to refresh", Snackbar.LENGTH_INDEFINITE).also { it.show() }
+                        snackbar = Snackbar.make(
+                            refreshLayout,
+                            "Swipe down to refresh",
+                            Snackbar.LENGTH_INDEFINITE
+                        ).also { it.show() }
                         refreshLayout.isEnabled = true
                     } else {
                         snackbar?.dismiss()
@@ -251,7 +253,10 @@ class EpisodeListActivity : AppCompatActivity() {
                 downloadRequest.setDescription(description)
                 downloadRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 downloadRequest.setVisibleInDownloadsUi(true)
-                downloadRequest.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, sanitizeForFileName(downloadTitle))
+                downloadRequest.setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_DOWNLOADS,
+                    sanitizeForFileName(downloadTitle)
+                )
                 val taskId = downloadManager.enqueue(downloadRequest)
 //                titleEntry.downloadTasks[number] = taskId
 //                titleStorage.save()
@@ -339,7 +344,8 @@ class EpisodeListActivity : AppCompatActivity() {
                         if (link != null) {
                             val storage = StorageLocator.locate(link)
                             if (storage != null) {
-                                val streamLink = withContext(Dispatchers.IO) { storage.extractDownload(link) }
+                                val streamLink =
+                                    withContext(Dispatchers.IO) { storage.extractDownload(link) }
                                 println(streamLink)
                                 presentLinkToTheUser(episodeName, streamLink)
                             } else {

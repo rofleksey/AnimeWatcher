@@ -3,6 +3,10 @@ package ru.rofleksey.animewatcher.api.provider
 import android.content.Context
 import android.content.SharedPreferences
 import com.bumptech.glide.load.model.GlideUrl
+import com.google.gson.Gson
+import okhttp3.HttpUrl
+import okhttp3.MultipartBody
+import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
 import ru.rofleksey.animewatcher.api.model.ProviderStats
@@ -10,10 +14,6 @@ import ru.rofleksey.animewatcher.api.model.Quality
 import ru.rofleksey.animewatcher.api.model.TitleInfo
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
-import com.google.gson.Gson
-import okhttp3.HttpUrl
-import okhttp3.MultipartBody
-import org.jsoup.Jsoup
 
 class AnimeDub : AnimeProvider {
     companion object {
@@ -60,7 +60,8 @@ class AnimeDub : AnimeProvider {
                 result.add(
                     TitleInfo(
                         title = titles[i],
-                        details = details[i]["Количество серий:"] ?: details[i]["Год выхода:"] ?: "",
+                        details = details[i]["Количество серий:"] ?: details[i]["Год выхода:"]
+                        ?: "",
                         image = HttpUrl.Builder()
                             .scheme("https")
                             .host(HOST)
@@ -90,7 +91,11 @@ class AnimeDub : AnimeProvider {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
-    override suspend fun init(context: Context, prefs: SharedPreferences, updateStatus: (title: String) -> Unit) {
+    override suspend fun init(
+        context: Context,
+        prefs: SharedPreferences,
+        updateStatus: (title: String) -> Unit
+    ) {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 

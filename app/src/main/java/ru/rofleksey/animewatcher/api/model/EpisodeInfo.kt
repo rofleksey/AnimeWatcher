@@ -1,8 +1,13 @@
 package ru.rofleksey.animewatcher.api.model
 
-class EpisodeInfo(val name: String, val image: String?, val fields: MutableMap<String, String> = HashMap()) {
+class EpisodeInfo(
+    val name: String,
+    val image: String?,
+    val fields: MutableMap<String, String> = HashMap()
+) {
     operator fun get(name: String): String {
-        return fields[name] ?: throw NoSuchElementException("EpisodeInfo doesn't contain field '$name'")
+        return fields[name]
+            ?: throw NoSuchElementException("EpisodeInfo doesn't contain field '$name'")
     }
 
     operator fun set(name: String, value: String) {

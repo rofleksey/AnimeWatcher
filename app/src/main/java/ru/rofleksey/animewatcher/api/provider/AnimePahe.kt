@@ -4,6 +4,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.model.LazyHeaders
+import com.google.gson.Gson
+import com.google.gson.JsonParser
+import okhttp3.HttpUrl
+import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
 import ru.rofleksey.animewatcher.api.model.ProviderStats
@@ -13,11 +17,6 @@ import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.SimpleCache
 import ru.rofleksey.animewatcher.api.util.actualBody
 import ru.rofleksey.animewatcher.util.Util
-import com.google.gson.Gson
-import com.google.gson.JsonParser
-import okhttp3.HttpUrl
-import org.jsoup.Jsoup
-import java.lang.IllegalArgumentException
 
 class AnimePahe : AnimeProvider {
     companion object {
@@ -58,7 +57,10 @@ class AnimePahe : AnimeProvider {
         })
     }
 
-    override suspend fun getStorageLinks(titleInfo: TitleInfo, episodeInfo: EpisodeInfo): Map<Quality, String> {
+    override suspend fun getStorageLinks(
+        titleInfo: TitleInfo,
+        episodeInfo: EpisodeInfo
+    ): Map<Quality, String> {
         return HttpHandler.instance.executeDirect({
             this.scheme("https")
                 .host(HOST)
@@ -99,17 +101,25 @@ class AnimePahe : AnimeProvider {
         }, allAnimeCache)
     }
 
-    override suspend fun init(context: Context, prefs: SharedPreferences, updateStatus: (title: String) -> Unit) {
+    override suspend fun init(
+        context: Context,
+        prefs: SharedPreferences,
+        updateStatus: (title: String) -> Unit
+    ) {
         updateStatus("Initializing AnimePahe...")
-        bypassCloudfare(context, HttpUrl.Builder()
-            .scheme("https")
-            .host(HOST)
-            .build())
+        bypassCloudfare(
+            context, HttpUrl.Builder()
+                .scheme("https")
+                .host(HOST)
+                .build()
+        )
         updateStatus("Initializing AnimePahe images...")
-        bypassCloudfare(context, HttpUrl.Builder()
-            .scheme("https")
-            .host("i.$HOST")
-            .build())
+        bypassCloudfare(
+            context, HttpUrl.Builder()
+                .scheme("https")
+                .host("i.$HOST")
+                .build()
+        )
     }
 
     override fun getGlideUrl(url: String): GlideUrl? {

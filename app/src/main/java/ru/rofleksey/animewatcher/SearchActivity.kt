@@ -23,6 +23,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.afollestad.materialdialogs.MaterialDialog
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.github.ybq.android.spinkit.SpinKitView
+import com.mikepenz.iconics.view.IconicsImageButton
+import jp.wasabeef.recyclerview.animators.FadeInAnimator
+import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.TitleInfo
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
@@ -30,11 +34,6 @@ import ru.rofleksey.animewatcher.storage.TitleStorage
 import ru.rofleksey.animewatcher.storage.TitleStorageEntry
 import ru.rofleksey.animewatcher.util.Debounce
 import ru.rofleksey.animewatcher.util.Util.Companion.toast
-import com.github.ybq.android.spinkit.SpinKitView
-import com.mikepenz.iconics.view.IconicsImageButton
-import jp.wasabeef.recyclerview.animators.FadeInAnimator
-import kotlinx.coroutines.*
-import kotlin.collections.ArrayList
 import kotlin.system.measureTimeMillis
 
 
@@ -77,7 +76,8 @@ class SearchActivity : AppCompatActivity() {
         println("titleStorage loaded in $storageMeasure ms")
         imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
 
-        providerName = sharedPreferences.getString("provider", ProviderFactory.ANIMEPAHE) ?: ProviderFactory.ANIMEPAHE
+        providerName = sharedPreferences.getString("provider", ProviderFactory.ANIMEPAHE)
+            ?: ProviderFactory.ANIMEPAHE
         provider = ProviderFactory.get(providerName)
 
         val barViewGroup = LayoutInflater.from(this).inflate(
@@ -266,7 +266,8 @@ class SearchActivity : AppCompatActivity() {
                         negativeButton(text = "No")
                     }
                 } else {
-                    val episodesIntent = Intent(this@SearchActivity, EpisodeListActivity::class.java)
+                    val episodesIntent =
+                        Intent(this@SearchActivity, EpisodeListActivity::class.java)
                     episodesIntent.putExtra(EpisodeListActivity.ARG, title)
                     startActivity(episodesIntent)
                 }
@@ -280,7 +281,7 @@ class SearchActivity : AppCompatActivity() {
                             titleStorage.update {
                                 it.remove(titleStorage.findByName(title))
                             }
-                            toast(this@SearchActivity,"'$title' removed")
+                            toast(this@SearchActivity, "'$title' removed")
                             adapter.notifyItemChanged(holder.adapterPosition)
                         }
                         negativeButton(text = "No")

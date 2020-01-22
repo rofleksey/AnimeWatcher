@@ -5,8 +5,8 @@ import android.os.Build
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
 import android.webkit.WebView
-import ru.rofleksey.animewatcher.util.Util
 import okhttp3.Cookie
+import ru.rofleksey.animewatcher.util.Util
 
 class WebViewWrapper private constructor(val webView: WebView) {
     companion object {
@@ -17,13 +17,14 @@ class WebViewWrapper private constructor(val webView: WebView) {
 
             })
             webView.clearCache(false)
-            with (webView.settings) {
+            with(webView.settings) {
                 javaScriptEnabled = true
                 javaScriptCanOpenWindowsAutomatically = true
                 userAgentString = Util.USER_AGENT
             }
             return WebViewWrapper(webView)
         }
+
         private val cookieRegex = Regex("([^=]+)=([^\\;]*);?\\s?")
     }
 

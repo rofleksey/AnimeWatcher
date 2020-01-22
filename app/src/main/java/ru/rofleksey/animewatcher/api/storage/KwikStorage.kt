@@ -1,13 +1,13 @@
 package ru.rofleksey.animewatcher.api.storage
 
+import okhttp3.HttpUrl
+import okhttp3.MultipartBody
+import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
 import ru.rofleksey.animewatcher.api.model.StorageType
 import ru.rofleksey.animewatcher.api.unpackers.PACKERUnpacker
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
-import okhttp3.HttpUrl
-import okhttp3.MultipartBody
-import org.jsoup.Jsoup
 import java.io.IOException
 import java.net.URI
 
@@ -61,20 +61,26 @@ class KwikStorage private constructor() : Storage {
             this.scheme(uri.scheme).host(uri.host).addPathSegments(downloadKwikSite)
         }, { this.addHeader("Referer", url) }, {
             val doc = Jsoup.parse(this.actualBody())
-            val form = doc.selectFirst("#app > main > div > div > div.columns.is-multiline > div:nth-child(2) > div:nth-child(2) > form")
-            val input = doc.selectFirst("#app > main > div > div > div.columns.is-multiline > div:nth-child(2) > div:nth-child(2) > form > input[type=hidden]")
+            val form =
+                doc.selectFirst("#app > main > div > div > div.columns.is-multiline > div:nth-child(2) > div:nth-child(2) > form")
+            val input =
+                doc.selectFirst("#app > main > div > div > div.columns.is-multiline > div:nth-child(2) > div:nth-child(2) > form > input[type=hidden]")
             DownloadExtraction(form.attr("action"), input.attr("value"))
         })
         // D
         val finalUri = URI(link)
-        val fUrl = HttpUrl.Builder().scheme(uri.scheme).host(uri.host).addPathSegments(downloadKwikSite).build()
-        return HttpHandler.instance.executeDirect({
-            this.scheme(finalUri.scheme).host(finalUri.host).addPathSegments(finalUri.path).query(finalUri.query)
-        }, {
-            this.post(MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("_token", token)
+        val fUrl =
+            HttpUrl.Builder().scheme(uri.scheme).host(uri.host).addPathSegments(downloadKwikSite)
                 .build()
+        return HttpHandler.instance.executeDirect({
+            this.scheme(finalUri.scheme).host(finalUri.host).addPathSegments(finalUri.path)
+                .query(finalUri.query)
+        }, {
+            this.post(
+                MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("_token", token)
+                    .build()
             ).addHeader("Referer", fUrl.toString())
         }, {
             this.request.url.toString()

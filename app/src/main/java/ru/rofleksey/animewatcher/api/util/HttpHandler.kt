@@ -1,14 +1,14 @@
 package ru.rofleksey.animewatcher.api.util
 
-import ru.rofleksey.animewatcher.util.Util
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.riversun.okhttp3.OkHttp3CookieHelper
+import ru.rofleksey.animewatcher.util.Util
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import okhttp3.HttpUrl.Companion.toHttpUrl
 
 
 class HttpHandler {
@@ -43,10 +43,12 @@ class HttpHandler {
         }
     }
 
-    suspend fun <T> execute(urlProcessor: HttpUrl.Builder.() -> HttpUrl.Builder,
-                            requestProcessor: Request.Builder.() -> Request.Builder,
-                            responseProcessor: Response.() -> T, cache: SimpleCache<T>, s: String = "",
-                            ii: Int = 0): T {
+    suspend fun <T> execute(
+        urlProcessor: HttpUrl.Builder.() -> HttpUrl.Builder,
+        requestProcessor: Request.Builder.() -> Request.Builder,
+        responseProcessor: Response.() -> T, cache: SimpleCache<T>, s: String = "",
+        ii: Int = 0
+    ): T {
         val cacheHit = cache.get(s, ii)
         if (cacheHit != null) {
             return cacheHit
@@ -67,9 +69,11 @@ class HttpHandler {
         return result
     }
 
-    suspend fun <T> executeDirect(urlProcessor: HttpUrl.Builder.() -> HttpUrl.Builder,
-                            requestProcessor: Request.Builder.() -> Request.Builder,
-                            responseProcessor: Response.() -> T): T {
+    suspend fun <T> executeDirect(
+        urlProcessor: HttpUrl.Builder.() -> HttpUrl.Builder,
+        requestProcessor: Request.Builder.() -> Request.Builder,
+        responseProcessor: Response.() -> T
+    ): T {
         val url = HttpUrl.Builder()
             .urlProcessor()
             .build()
@@ -89,7 +93,7 @@ fun Response.actualBody(): String {
 }
 
 @Throws(IOException::class)
-suspend fun Call.await(): Response   {
+suspend fun Call.await(): Response {
     return suspendCancellableCoroutine { continuation ->
         enqueue(object : Callback {
             override fun onResponse(call: Call, response: Response) {

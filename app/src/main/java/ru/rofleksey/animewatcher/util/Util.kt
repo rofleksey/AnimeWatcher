@@ -8,7 +8,8 @@ import androidx.core.net.toUri
 class Util {
     companion object {
         const val TAG = "animewatcher"
-        const val USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36"
+        const val USER_AGENT =
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36"
         private val FILENAME_REGEX = Regex("[^a-zA-Z0-9.-]")
 
         fun openInVlc(context: Context, str: String) {
