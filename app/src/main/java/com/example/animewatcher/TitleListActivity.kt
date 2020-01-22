@@ -1,6 +1,7 @@
 package com.example.animewatcher
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -19,6 +20,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.example.animewatcher.api.provider.AnimePahe
+import com.example.animewatcher.api.provider.ProviderFactory
 import com.example.animewatcher.storage.TitleStorage
 import com.example.animewatcher.storage.TitleStorageEntry
 import com.example.animewatcher.util.Util
@@ -41,6 +44,9 @@ class TitleListActivity : AppCompatActivity() {
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var imm: InputMethodManager
 
+    private lateinit var actionBarView: ViewGroup
+    private lateinit var loadingView: SpinKitView
+    private lateinit var loadingText: TextView
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutManager: RecyclerView.LayoutManager
     private lateinit var adapter: TitleEntryAdapter
@@ -53,6 +59,7 @@ class TitleListActivity : AppCompatActivity() {
     private var job: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
+    @SuppressLint("InflateParams")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_title_list)
@@ -62,7 +69,7 @@ class TitleListActivity : AppCompatActivity() {
         titleStorage = TitleStorage.load(sharedPreferences)
         imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
 
-        val barViewGroup = LayoutInflater.from(this).inflate(
+        actionBarView = LayoutInflater.from(this).inflate(
             R.layout.action_bar_title_list,
             null, false
         ) as ViewGroup
@@ -71,15 +78,17 @@ class TitleListActivity : AppCompatActivity() {
             ActionBar.LayoutParams.MATCH_PARENT,
             ActionBar.LayoutParams.MATCH_PARENT
         )
-        supportActionBar?.setCustomView(barViewGroup, layout)
+        supportActionBar?.setCustomView(actionBarView, layout)
         supportActionBar?.setDisplayShowCustomEnabled(true)
 
-        searchButton = barViewGroup.findViewById(R.id.button_search)
+        searchButton = actionBarView.findViewById(R.id.button_search)
         searchButton.setOnClickListener {
             val searchIntent = Intent(this, SearchActivity::class.java)
             startActivity(searchIntent)
         }
 
+        loadingView = findViewById(R.id.loading)
+        loadingText = findViewById(R.id.loading_text)
         recyclerView = findViewById(R.id.recycler_view)
         recyclerView.itemAnimator = LandingAnimator()
         recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
@@ -100,7 +109,6 @@ class TitleListActivity : AppCompatActivity() {
         })
         layoutManager = LinearLayoutManager(this)
         recyclerView.layoutManager = layoutManager
-        titleData.addAll(titleStorage.entryList)
         adapter = TitleEntryAdapter(titleData)
         recyclerView.adapter = adapter
 
@@ -114,6 +122,19 @@ class TitleListActivity : AppCompatActivity() {
                 }
             })
             .check()
+
+        job = coroutineScope.launch {
+            ProviderFactory.init(this@TitleListActivity, sharedPreferences) {
+                loadingText.text = it
+            }
+            titleData.clear()
+            titleData.addAll(titleStorage.entryList)
+            adapter.notifyItemRangeInserted(0, titleData.size)
+            loadingView.visibility = View.GONE
+            loadingText.visibility = View.GONE
+            recyclerView.visibility = View.VISIBLE
+            actionBarView.visibility = View.VISIBLE
+        }
     }
 
     override fun onDestroy() {

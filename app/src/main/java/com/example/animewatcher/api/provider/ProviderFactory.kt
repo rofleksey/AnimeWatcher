@@ -1,5 +1,7 @@
 package com.example.animewatcher.api.provider
 
+import android.content.Context
+import android.content.SharedPreferences
 import com.example.animewatcher.api.AnimeProvider
 
 class ProviderFactory {
@@ -11,6 +13,11 @@ class ProviderFactory {
                 ANIMEPAHE -> AnimePahe()
                 else -> throw NoSuchElementException("Invalid anime provider")
             }
+        }
+
+        suspend fun init(context: Context, prefs: SharedPreferences,
+                         updateStatus: (title: String) -> Unit) {
+            AnimePahe().init(context, prefs, updateStatus)
         }
     }
 }

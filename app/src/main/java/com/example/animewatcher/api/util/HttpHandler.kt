@@ -1,5 +1,7 @@
 package com.example.animewatcher.api.util
 
+import com.example.animewatcher.api.storage.KwikStorage
+import com.example.animewatcher.util.Util
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
 import okhttp3.HttpUrl
@@ -7,11 +9,40 @@ import org.riversun.okhttp3.OkHttp3CookieHelper
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import okhttp3.HttpUrl.Companion.toHttpUrl
 
 
 class HttpHandler {
-    private val httpClient = OkHttpClient.Builder().cookieJar(OkHttp3CookieHelper().cookieJar())
+    companion object {
+        val instance: HttpHandler by lazy { HOLDER.INSTANCE }
+    }
+
+    private object HOLDER {
+        val INSTANCE = HttpHandler()
+    }
+
+    private val cookieJar = OkHttp3CookieHelper()
+    private val httpClient = OkHttpClient.Builder()
+        .cookieJar(cookieJar.cookieJar())
+        .addInterceptor(Interceptor {
+            val originalRequest: Request = it.request()
+            val requestWithUserAgent = originalRequest.newBuilder()
+                .header("User-Agent", Util.USER_AGENT)
+                .build()
+            it.proceed(requestWithUserAgent)
+        })
         .build()
+
+    fun getCookies(url: String): List<Cookie> {
+        return cookieJar.cookieJar().loadForRequest(url.toHttpUrl())
+    }
+
+    fun saveCookies(url: HttpUrl, cookies: List<Cookie>) {
+        println("httpClient::saveCookies for $url - $cookies")
+        cookies.forEach {
+            cookieJar.setCookie(url.toString(), it.name, it.value)
+        }
+    }
 
     suspend fun <T> execute(urlProcessor: HttpUrl.Builder.() -> HttpUrl.Builder,
                     requestProcessor: Request.Builder.() -> Request.Builder,

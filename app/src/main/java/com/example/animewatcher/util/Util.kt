@@ -15,19 +15,9 @@ import kotlin.coroutines.resumeWithException
 
 class Util {
     companion object {
-        val TAG = "animewatcher"
-        val FILENAME_REGEX = Regex("[^a-zA-Z0-9.-]")
-
-        fun getEpisodeNumber(s: String): Int {
-            if (s.isEmpty()) {
-                throw NumberFormatException("String is empty")
-            }
-            val index = s.indexOfFirst { it != '0' }
-            if (index == -1) {
-                return 0
-            }
-            return s.substring(index until s.length).toInt()
-        }
+        const val TAG = "animewatcher"
+        const val USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36"
+        private val FILENAME_REGEX = Regex("[^a-zA-Z0-9.-]")
 
         fun openInVlc(context: Context, str: String) {
             val vlc = Intent(Intent.ACTION_VIEW)

@@ -1,15 +1,18 @@
 package com.example.animewatcher.api.provider
 
+import com.example.animewatcher.api.model.EpisodeInfo
 import com.example.animewatcher.api.model.Quality
+import com.example.animewatcher.api.model.TitleInfo
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.TestInstance
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class AnimePaheTest {
     private lateinit var pahe : AnimePahe
+    private lateinit var hunter: TitleInfo
+    private lateinit var e148: EpisodeInfo
 
     @BeforeAll
     fun init() {
@@ -17,47 +20,41 @@ class AnimePaheTest {
     }
 
     @Test
+    @Order(1)
     fun search() {
         val list = runBlocking { pahe.search("hunter") }
         assertFalse(list.isEmpty())
         assertEquals("Hunter x Hunter (2011)", list[0].title)
+        hunter = list[0]
     }
 
     @Test
-    fun searchExact() {
-        val title = runBlocking { pahe.searchExact("Hunter x Hunter (2011)") }
-        assertFalse(title == null)
-        assertEquals("Hunter x Hunter (2011)", title?.title)
-    }
-
-    @Test
-    fun searchExactInvalid() {
-        val title = runBlocking { pahe.searchExact("Hunter x Plumber") }
-        assertTrue(title == null)
-    }
-
-    @Test
+    @Order(2)
     fun episodePage() {
-        val list = runBlocking { pahe.getEpisodeList("Hunter x Hunter (2011)", 0) }
+        val list = runBlocking { pahe.getEpisodeList(hunter, 0) }
         assertFalse(list.isEmpty())
         assertEquals("148", list[0].name)
     }
 
     @Test
+    @Order(3)
     fun allEpisodes() {
-        val list = runBlocking { pahe.getAllEpisodes("Hunter x Hunter (2011)") }
+        val list = runBlocking { pahe.getAllEpisodes(hunter) }
         assertEquals(146, list.size)
+        e148 = list.last()
     }
 
     @Test
+    @Order(4)
     fun storageLink() {
-        val map = runBlocking { pahe.getStorageLinks("Hunter x Hunter (2011)", 148) }
+        val map = runBlocking { pahe.getStorageLinks(hunter, e148) }
         assertFalse(map.isEmpty())
         assertTrue(map.containsKey(Quality.q720))
         assertEquals("https://kwik.cx/e/7nbfAA7aJyf1", map[Quality.q720])
     }
 
     @Test
+    @Order(5)
     fun allTitles() {
         val list = runBlocking { pahe.getAllTitles() }
         if (list != null) {

@@ -5,6 +5,7 @@ import com.example.animewatcher.api.model.StorageType
 import com.example.animewatcher.api.unpackers.PACKERUnpacker
 import com.example.animewatcher.api.util.HttpHandler
 import com.example.animewatcher.api.util.actualBody
+import com.example.animewatcher.util.Util
 import okhttp3.HttpUrl
 import okhttp3.MultipartBody
 import org.jsoup.Jsoup
@@ -22,8 +23,6 @@ class KwikStorage private constructor() : Storage {
         val INSTANCE = KwikStorage()
     }
 
-    private val httpClient = HttpHandler()
-
     private fun getRegexValue(str: String, regex: Regex): String {
         val match = regex.find(str) ?: throw IOException("can't match regex!")
         return match.groupValues[1]
@@ -31,7 +30,7 @@ class KwikStorage private constructor() : Storage {
 
     override suspend fun extractStream(url: String): String {
         val uri = URI(url)
-        return httpClient.executeDirect({
+        return HttpHandler.instance.executeDirect({
             this.scheme(uri.scheme).host(uri.host).addPathSegments(uri.path)
         }, { this.addHeader("Referer", url) }, {
             val doc = Jsoup.parse(this.actualBody())
@@ -47,7 +46,7 @@ class KwikStorage private constructor() : Storage {
     override suspend fun extractDownload(url: String): String {
         val uri = URI(url)
         // E
-        val downloadKwikSite = httpClient.executeDirect({
+        val downloadKwikSite = HttpHandler.instance.executeDirect({
             this.scheme(uri.scheme).host(uri.host).addPathSegments(uri.path)
         }, { this.addHeader("Referer", url) }, {
             val doc = Jsoup.parse(this.actualBody())
@@ -59,7 +58,7 @@ class KwikStorage private constructor() : Storage {
         })
         // F
         println("downloadKwikSite - $downloadKwikSite")
-        val (link, token) = httpClient.executeDirect({
+        val (link, token) = HttpHandler.instance.executeDirect({
             this.scheme(uri.scheme).host(uri.host).addPathSegments(downloadKwikSite)
         }, { this.addHeader("Referer", url) }, {
             val doc = Jsoup.parse(this.actualBody())
@@ -70,7 +69,7 @@ class KwikStorage private constructor() : Storage {
         // D
         val finalUri = URI(link)
         val fUrl = HttpUrl.Builder().scheme(uri.scheme).host(uri.host).addPathSegments(downloadKwikSite).build()
-        return httpClient.executeDirect({
+        return HttpHandler.instance.executeDirect({
             this.scheme(finalUri.scheme).host(finalUri.host).addPathSegments(finalUri.path).query(finalUri.query)
         }, {
             this.post(MultipartBody.Builder()

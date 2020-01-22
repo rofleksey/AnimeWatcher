@@ -95,7 +95,7 @@ class SearchActivity : AppCompatActivity() {
         supportActionBar?.setDisplayShowCustomEnabled(true)
 
         searchView.requestFocus()
-        searchView.setText("Search on $providerName")
+        searchView.hint = "Search on $providerName"
 
         buttonBack.setOnClickListener {
             searchDebounces.stop()
@@ -136,7 +136,7 @@ class SearchActivity : AppCompatActivity() {
                                         oldPos: Int,
                                         newPos: Int
                                     ): Boolean =
-                                        oldData[oldPos].id == results[newPos].id
+                                        oldData[oldPos].title == results[newPos].title
 
                                     override fun getOldListSize(): Int = oldData.size
 
@@ -233,7 +233,7 @@ class SearchActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: TitleViewHolder, pos: Int) {
             Glide
                 .with(this@SearchActivity)
-                .load(data[pos].image)
+                .load(provider.getGlideUrl(data[pos].image ?: ""))
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
             val title = data[pos].title

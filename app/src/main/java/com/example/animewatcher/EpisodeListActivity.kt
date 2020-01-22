@@ -17,13 +17,11 @@ import androidx.appcompat.app.ActionBar
 import androidx.core.net.toUri
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.afollestad.materialdialogs.MaterialDialog
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
-import com.bumptech.glide.request.RequestOptions
 import com.example.animewatcher.api.AnimeProvider
 import com.example.animewatcher.api.model.EpisodeInfo
 import com.example.animewatcher.api.model.Quality
@@ -40,7 +38,6 @@ import kotlin.collections.ArrayList
 import com.example.animewatcher.util.Util.Companion.toast
 import com.github.ybq.android.spinkit.SpinKitView
 import com.google.android.material.snackbar.Snackbar
-import java.util.*
 
 class EpisodeListActivity : AppCompatActivity() {
     companion object {
@@ -108,7 +105,7 @@ class EpisodeListActivity : AppCompatActivity() {
                         override fun areItemsTheSame(
                             oldPos: Int,
                             newPos: Int
-                        ): Boolean = episodeData[oldPos].id == refreshData!![newPos].id
+                        ): Boolean = episodeData[oldPos].name == refreshData!![newPos].name
 
                         override fun getOldListSize(): Int = episodeData.size
 
@@ -168,7 +165,7 @@ class EpisodeListActivity : AppCompatActivity() {
                 val firstTime = titleEntry.lastEpisodeNumber == -1
                 val episodes = if (firstTime) {
                     withContext(Dispatchers.IO) {
-                        provider.getAllEpisodes(titleEntry.info.title)
+                        provider.getAllEpisodes(titleEntry.info)
                     }
                 } else {
                     titleEntry.cachedEpisodeList
@@ -187,8 +184,9 @@ class EpisodeListActivity : AppCompatActivity() {
                 }
                 adapter.notifyItemRangeInserted(0, episodeData.size)
                 if (!firstTime) {
+                    provider.clearCache()
                     val newEpisodes = withContext(Dispatchers.IO) {
-                        provider.getAllEpisodes(titleEntry.info.title)
+                        provider.getAllEpisodes(titleEntry.info)
                     }
                     if (!isActive) {
                         return@launch
@@ -214,17 +212,17 @@ class EpisodeListActivity : AppCompatActivity() {
         }
     }
 
-    private fun presentLinkToTheUser(number: Int, link: String) {
+    private fun presentLinkToTheUser(episodeName: String, link: String) {
         MaterialDialog(this).show {
             title(text = "Action")
-            message(text = "What do you want to do with #$number ?")
+            message(text = "What do you want to do with #$episodeName ?")
             positiveButton(text = "watch via VLC") {
                 openInVlc(this@EpisodeListActivity, link)
             }
             negativeButton(text = "download") {
                 val downloadRequest = DownloadManager.Request(link.toUri())
-                val downloadTitle = "${titleEntry.info.title}_${number}.mp4"
-                val description = "Downloading episode #$number of ${titleEntry.info.title}"
+                val downloadTitle = "${titleEntry.info.title}_${episodeName}.mp4"
+                val description = "Downloading episode #$episodeName of ${titleEntry.info.title}"
                 downloadRequest.setTitle(downloadTitle)
                 downloadRequest.setDescription(description)
                 downloadRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -274,12 +272,12 @@ class EpisodeListActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: EpisodeViewHolder, pos: Int) {
             Glide
                 .with(this@EpisodeListActivity)
-                .load(data[pos].image)
+                .load(provider.getGlideUrl(data[pos].image ?: ""))
                 //.apply(RequestOptions.circleCropTransform())
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
-            val number = data[pos].num
-            holder.text.text = number.toString()
+            val episodeName = data[pos].name
+            holder.text.text = episodeName
             holder.view.setOnClickListener {
                 if (holder.loading.visibility != View.GONE || job?.isActive != false) {
                     return@setOnClickListener
@@ -289,8 +287,8 @@ class EpisodeListActivity : AppCompatActivity() {
                         holder.loading.visibility = View.VISIBLE
                         val links = withContext(Dispatchers.IO) {
                             provider.getStorageLinks(
-                                titleEntry.info.title,
-                                number
+                                titleEntry.info,
+                                data[pos]
                             )
                         }
                         val link = links[Quality.q720]
@@ -299,7 +297,7 @@ class EpisodeListActivity : AppCompatActivity() {
                             if (storage != null) {
                                 val streamLink = withContext(Dispatchers.IO) { storage.extractDownload(link) }
                                 println(streamLink)
-                                presentLinkToTheUser(number, streamLink)
+                                presentLinkToTheUser(episodeName, streamLink)
                             } else {
                                 toast(
                                     this@EpisodeListActivity,

@@ -3,16 +3,24 @@ package com.example.animewatcher.storage
 import android.content.SharedPreferences
 import com.example.animewatcher.api.model.TitleInfo
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 
 class TitleStorage private constructor(val prefs: SharedPreferences) {
     companion object {
         fun load(prefs: SharedPreferences): TitleStorage {
             return TitleStorage(prefs).also { it.reload() }
         }
+
+        private fun getGson(): Gson {
+            return GsonBuilder().enableComplexMapKeySerialization()
+                .setPrettyPrinting().create()
+        }
     }
 
-    private val data: TitleStorageData = TitleStorageData(ArrayList<TitleStorageEntry>())
-    private val gson = Gson()
+    private val data: TitleStorageData = TitleStorageData(ArrayList())
+    private val gson = getGson()
+
+
 
     val entryList: ArrayList<TitleStorageEntry>
         get() = data.entryList
@@ -23,7 +31,7 @@ class TitleStorage private constructor(val prefs: SharedPreferences) {
     fun reload() {
         val json = prefs.getString("title_storage", null)
         if (json != null) {
-            val otherData = Gson().fromJson<TitleStorageData>(json, TitleStorageData::class.java)
+            val otherData = getGson().fromJson<TitleStorageData>(json, TitleStorageData::class.java)
             data.entryList.clear()
             data.entryList.addAll(otherData.entryList)
         }
@@ -31,6 +39,7 @@ class TitleStorage private constructor(val prefs: SharedPreferences) {
 
     fun save() {
         val json = gson.toJson(data)
+        println("json - $json")
         prefs.edit().putString("title_storage", json).apply()
     }
 

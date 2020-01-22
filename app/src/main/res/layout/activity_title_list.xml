@@ -14,11 +14,38 @@
         android:layout_marginTop="20dp"
         android:scrollbars="vertical"
         android:elevation="1dp"
+        android:visibility="gone"
         app:layout_constrainedHeight="true"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.0" />
+
+    <TextView
+        android:id="@+id/loading_text"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:textSize="14sp"
+        android:fontFamily="@font/overpass_mono"
+        android:background="@color/colorGray"
+        android:textColor="@color/colorWhite"
+        app:layout_constrainedWidth="true"
+        app:layout_constraintStart_toEndOf="@id/loading"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+
+    <com.github.ybq.android.spinkit.SpinKitView
+        android:id="@+id/loading"
+        style="@style/SpinKitView.DoubleBounce"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:elevation="3dp"
+        app:SpinKit_Color="@color/colorWhite"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/loading_text"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

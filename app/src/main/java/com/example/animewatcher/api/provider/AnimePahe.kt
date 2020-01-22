@@ -1,31 +1,45 @@
 package com.example.animewatcher.api.provider
 
-import com.example.animewatcher.api.*
+import android.content.Context
+import android.content.SharedPreferences
+import android.os.Handler
+import android.webkit.CookieManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import com.bumptech.glide.load.model.GlideUrl
+import com.bumptech.glide.load.model.LazyHeaders
+import com.example.animewatcher.api.AnimeProvider
 import com.example.animewatcher.api.model.EpisodeInfo
 import com.example.animewatcher.api.model.ProviderStats
 import com.example.animewatcher.api.model.Quality
 import com.example.animewatcher.api.model.TitleInfo
 import com.example.animewatcher.api.util.HttpHandler
 import com.example.animewatcher.api.util.SimpleCache
+import com.example.animewatcher.api.util.WebViewWrapper
 import com.example.animewatcher.api.util.actualBody
+import com.example.animewatcher.util.Util
 import com.google.gson.Gson
 import com.google.gson.JsonParser
+import okhttp3.Cookie
+import okhttp3.HttpUrl
 import org.jsoup.Jsoup
+import java.io.IOException
+import java.net.HttpCookie
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 class AnimePahe : AnimeProvider {
     companion object {
+        private const val BASE_URL = "https://animepahe.com"
         private const val HOST = "animepahe.com"
         private val gson = Gson()
     }
 
-    private val httpHandler = HttpHandler()
     private val allAnimeCache = SimpleCache<List<String>>()
-    private val searchCache = SimpleCache<List<TitleInfo>>()
-    private val episodesCache = SimpleCache<List<EpisodeInfo>>()
-    private val storageCache = SimpleCache<Map<Quality, String>>()
 
     override suspend fun search(title: String): List<TitleInfo> {
-        return httpHandler.execute({
+        return HttpHandler.instance.executeDirect({
             this.scheme("https")
                 .host(HOST)
                 .addPathSegment("api")
@@ -35,49 +49,38 @@ class AnimePahe : AnimeProvider {
         }, { this }, {
             val obj = gson.fromJson(this.actualBody(), PaheTitleResponse::class.java)
             obj.toTitleInfo()
-        }, searchCache, title)
+        })
     }
 
-    override suspend fun getEpisodeList(title: String, page: Int): List<EpisodeInfo> {
-        val searchResult = searchExact(title)
-        if (searchResult == null) {
-            println("exact search failed: $title")
-            return listOf()
-        }
-        return httpHandler.execute({
+    override suspend fun getEpisodeList(titleInfo: TitleInfo, page: Int): List<EpisodeInfo> {
+        return HttpHandler.instance.executeDirect({
             this.scheme("https")
                 .host(HOST)
                 .addPathSegment("api")
                 .addQueryParameter("m", "release")
-                .addQueryParameter("id", searchResult.id.toString())
+                .addQueryParameter("id", titleInfo["id"])
                 .addQueryParameter("l", "30")
                 .addQueryParameter("sort", "episode_desc")
                 .addQueryParameter("page", (page + 1).toString())
         }, { this }, {
             val obj = gson.fromJson(this.actualBody(), PaheEpisodesResponse::class.java)
             obj.toEpisodeInfo()
-        }, episodesCache, title, page)
+        })
     }
 
-    override suspend fun getStorageLinks(title: String, episode: Int): Map<Quality, String> {
-        val episodeResult = getExactEpisode(title, episode)
-        if (episodeResult == null) {
-            println("get exact episode failed: $title::$episode")
-            return mapOf()
-        }
-        val episodeId = episodeResult.id.toString()
-        return httpHandler.execute({
+    override suspend fun getStorageLinks(titleInfo: TitleInfo, episodeInfo: EpisodeInfo): Map<Quality, String> {
+        return HttpHandler.instance.executeDirect({
             this.scheme("https")
                 .host(HOST)
                 .addPathSegment("api")
                 .addQueryParameter("m", "embed")
-                .addQueryParameter("id", episodeId)
+                .addQueryParameter("id", episodeInfo["id"])
                 .addQueryParameter("p", "kwik")
         }, { this }, {
             println("getStorageLink: $this")
             val obj = JsonParser.parseString(this.actualBody()).asJsonObject
             val data = obj.getAsJsonObject("data")
-            val ep = data.getAsJsonObject(episodeId)
+            val ep = data.getAsJsonObject(episodeInfo["id"])
             val links = mutableMapOf<Quality, String>()
             for (prop in ep.entrySet()) {
                 val key = when (prop.key) {
@@ -90,11 +93,11 @@ class AnimePahe : AnimeProvider {
                 links[key] = prop.value.asJsonObject.get("url").asString
             }
             links
-        }, storageCache, title, episode)
+        })
     }
 
     override suspend fun getAllTitles(): List<String>? {
-        return httpHandler.execute({
+        return HttpHandler.instance.execute({
             this.scheme("https")
                 .host(HOST)
                 .addPathSegment("anime")
@@ -106,17 +109,43 @@ class AnimePahe : AnimeProvider {
         }, allAnimeCache)
     }
 
+    override suspend fun init(context: Context, prefs: SharedPreferences, updateStatus: (title: String) -> Unit) {
+        updateStatus("Initializing AnimePahe...")
+        bypassCloudfare(context, HttpUrl.Builder()
+            .scheme("https")
+            .host(HOST)
+            .build())
+        updateStatus("Initializing AnimePahe images...")
+        bypassCloudfare(context, HttpUrl.Builder()
+            .scheme("https")
+            .host("i.$HOST")
+            .build())
+    }
+
+    override fun getGlideUrl(url: String): GlideUrl {
+        val cookies = HttpHandler.instance.getCookies(url).joinToString("; ") {
+            "${it.name}=${it.value}"
+        }
+        println("glide cookies for $url: $cookies")
+        return GlideUrl(url,
+            LazyHeaders.Builder()
+                .addHeader("User-Agent", Util.USER_AGENT)
+                .addHeader("Cookie", cookies)
+                .build()
+        )
+    }
+
     override fun stats(): ProviderStats {
         return ProviderStats(
-            episodesPerPage = 30,
-            episodesDesc = true
+            episodesDesc = true,
+            hasCloudfare = true,
+            needsContext = true,
+            loadingString = "Bypassing cloudflare scrape shield"
         )
     }
 
     override fun clearCache() {
-        storageCache.clear()
-        episodesCache.clear()
-        searchCache.clear()
+        allAnimeCache.clear()
     }
 
 }
