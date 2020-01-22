@@ -61,6 +61,7 @@ dependencies {
     implementation 'jp.wasabeef:recyclerview-animators:3.0.0'
     implementation 'com.karumi:dexter:6.0.1'
     implementation 'com.github.ybq:Android-SpinKit:1.4.0'
+    implementation 'jp.wasabeef:glide-transformations:4.1.0'
 
     annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
 

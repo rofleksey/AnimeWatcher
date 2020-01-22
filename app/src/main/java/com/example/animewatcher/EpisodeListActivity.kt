@@ -22,6 +22,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.afollestad.materialdialogs.MaterialDialog
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.bumptech.glide.request.RequestOptions.bitmapTransform
 import com.example.animewatcher.api.AnimeProvider
 import com.example.animewatcher.api.model.EpisodeInfo
 import com.example.animewatcher.api.model.Quality
@@ -38,10 +39,12 @@ import kotlin.collections.ArrayList
 import com.example.animewatcher.util.Util.Companion.toast
 import com.github.ybq.android.spinkit.SpinKitView
 import com.google.android.material.snackbar.Snackbar
+import jp.wasabeef.glide.transformations.BlurTransformation
 
 class EpisodeListActivity : AppCompatActivity() {
     companion object {
         private const val CROSSFADE_DURATION = 500
+        private const val CROSSFADE_DURATION_BACKGROUND = 800
         private const val ITEM_MARGIN = 25
         private const val COLUMN_COUNT = 3
         const val ARG = "titleName"
@@ -50,6 +53,7 @@ class EpisodeListActivity : AppCompatActivity() {
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var downloadManager: DownloadManager
 
+    private lateinit var background: ImageView
     private lateinit var refreshLayout: SwipeRefreshLayout
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutManager: RecyclerView.LayoutManager
@@ -92,6 +96,8 @@ class EpisodeListActivity : AppCompatActivity() {
         )
         supportActionBar?.setCustomView(barViewGroup, layout)
         supportActionBar?.setDisplayShowCustomEnabled(true)
+
+        background = findViewById(R.id.background)
 
         refreshLayout = findViewById(R.id.refresh_layout)
         refreshLayout.setOnRefreshListener {
@@ -141,15 +147,16 @@ class EpisodeListActivity : AppCompatActivity() {
                 parent: RecyclerView,
                 state: RecyclerView.State
             ) {
-                val pos = parent.getChildAdapterPosition(view)
-                if (pos >= COLUMN_COUNT) {
-                    outRect.top = ITEM_MARGIN
-                }
-                if (pos < parent.childCount - COLUMN_COUNT) {
-                    outRect.bottom = ITEM_MARGIN
-                }
+//                val pos = parent.getChildAdapterPosition(view)
+//                if (pos >= COLUMN_COUNT) {
+//                    outRect.top = ITEM_MARGIN
+//                }
+//                if (pos < parent.adapter!!.itemCount - COLUMN_COUNT) {
+//                    outRect.bottom = ITEM_MARGIN
+//                }
                 outRect.left = ITEM_MARGIN
                 outRect.right = ITEM_MARGIN
+                outRect.top = ITEM_MARGIN
             }
         })
         layoutManager = GridLayoutManager(this, COLUMN_COUNT, RecyclerView.VERTICAL, false)
@@ -159,6 +166,14 @@ class EpisodeListActivity : AppCompatActivity() {
 
         snackbar = Snackbar.make(refreshLayout, "Refreshing...", Snackbar.LENGTH_INDEFINITE).also { it.show() }
         snackbar?.setBackgroundTint(resources.getColor(R.color.colorPanel))
+
+        Glide
+            .with(this)
+            .load(provider.getGlideUrl(titleEntry.info.image ?: ""))
+            .error(R.drawable.placeholder)
+            .apply(bitmapTransform(BlurTransformation(15, 3)))
+            .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION_BACKGROUND))
+            .into(background)
 
         job = coroutineScope.launch {
             try {
@@ -270,13 +285,16 @@ class EpisodeListActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: EpisodeViewHolder, pos: Int) {
+            val item = data[pos]
             Glide
                 .with(this@EpisodeListActivity)
-                .load(provider.getGlideUrl(data[pos].image ?: ""))
+                .load(provider.getGlideUrl(item.image ?: ""))
+                .placeholder(R.drawable.img)
+                .error(R.drawable.placeholder)
                 //.apply(RequestOptions.circleCropTransform())
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
-            val episodeName = data[pos].name
+            val episodeName = item.name
             holder.text.text = episodeName
             holder.view.setOnClickListener {
                 if (holder.loading.visibility != View.GONE || job?.isActive != false) {
@@ -288,7 +306,7 @@ class EpisodeListActivity : AppCompatActivity() {
                         val links = withContext(Dispatchers.IO) {
                             provider.getStorageLinks(
                                 titleEntry.info,
-                                data[pos]
+                                item
                             )
                         }
                         val link = links[Quality.q720]

@@ -96,7 +96,7 @@ class AnimeDub : AnimeProvider {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
-    override fun getGlideUrl(url: String): GlideUrl {
+    override fun getGlideUrl(url: String): GlideUrl? {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 

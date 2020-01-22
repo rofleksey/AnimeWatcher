@@ -24,6 +24,8 @@ import okhttp3.Cookie
 import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import java.io.IOException
+import java.lang.Exception
+import java.lang.IllegalArgumentException
 import java.net.HttpCookie
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -122,17 +124,23 @@ class AnimePahe : AnimeProvider {
             .build())
     }
 
-    override fun getGlideUrl(url: String): GlideUrl {
-        val cookies = HttpHandler.instance.getCookies(url).joinToString("; ") {
-            "${it.name}=${it.value}"
+    override fun getGlideUrl(url: String): GlideUrl? {
+        try {
+            println("getGlideUrl - $url")
+            val cookies = HttpHandler.instance.getCookies(url).joinToString("; ") {
+                "${it.name}=${it.value}"
+            }
+            println("glide cookies for $url: $cookies")
+            return GlideUrl(
+                url,
+                LazyHeaders.Builder()
+                    .addHeader("User-Agent", Util.USER_AGENT)
+                    .addHeader("Cookie", cookies)
+                    .build()
+            )
+        } catch (e: IllegalArgumentException) {
+            return null
         }
-        println("glide cookies for $url: $cookies")
-        return GlideUrl(url,
-            LazyHeaders.Builder()
-                .addHeader("User-Agent", Util.USER_AGENT)
-                .addHeader("Cookie", cookies)
-                .build()
-        )
     }
 
     override fun stats(): ProviderStats {

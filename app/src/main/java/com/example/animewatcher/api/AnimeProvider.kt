@@ -24,7 +24,7 @@ interface AnimeProvider {
     suspend fun getStorageLinks(titleInfo: TitleInfo, episodeInfo: EpisodeInfo) : Map<Quality, String>
     suspend fun getAllTitles(): List<String>?
     suspend fun init(context: Context, prefs: SharedPreferences, updateStatus: (title: String) -> Unit)
-    fun getGlideUrl(url: String): GlideUrl
+    fun getGlideUrl(url: String): GlideUrl?
     fun stats(): ProviderStats
     fun clearCache()
 
@@ -51,6 +51,8 @@ interface AnimeProvider {
                             result.clear()
                             result.addAll(webWrapper.getCookies(url, "animepahe.com"))
                             cont.resume(Unit)
+                        } else {
+                            println("title = ${webWrapper.webView.title}")
                         }
                     } catch (e: Throwable) {
                         cont.resumeWithException(e)

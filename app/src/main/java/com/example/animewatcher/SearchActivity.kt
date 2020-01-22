@@ -2,6 +2,7 @@ package com.example.animewatcher
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Rect
 import android.os.Bundle
@@ -28,10 +29,13 @@ import com.example.animewatcher.api.provider.ProviderFactory
 import com.example.animewatcher.storage.TitleStorage
 import com.example.animewatcher.storage.TitleStorageEntry
 import com.example.animewatcher.util.Debounce
+import com.example.animewatcher.util.Util
 import com.example.animewatcher.util.Util.Companion.toast
 import com.github.ybq.android.spinkit.SpinKitView
 import com.mikepenz.iconics.view.IconicsImageButton
+import jp.wasabeef.recyclerview.animators.FadeInAnimator
 import jp.wasabeef.recyclerview.animators.LandingAnimator
+import jp.wasabeef.recyclerview.animators.ScaleInAnimator
 import kotlinx.coroutines.*
 import kotlin.collections.ArrayList
 import kotlin.system.measureTimeMillis
@@ -172,7 +176,7 @@ class SearchActivity : AppCompatActivity() {
         loadingView = findViewById(R.id.loading)
 
         recyclerView = findViewById(R.id.recycler_view)
-        recyclerView.itemAnimator = LandingAnimator()
+        recyclerView.itemAnimator = FadeInAnimator()
         recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
             override fun getItemOffsets(
                 outRect: Rect,
@@ -180,13 +184,14 @@ class SearchActivity : AppCompatActivity() {
                 parent: RecyclerView,
                 state: RecyclerView.State
             ) {
-                val pos = parent.getChildAdapterPosition(view)
-                if (pos != 0) {
-                    outRect.top = ITEM_MARGIN
-                }
-                if (pos != parent.childCount - 1) {
-                    outRect.bottom = ITEM_MARGIN
-                }
+//                val pos = parent.getChildAdapterPosition(view)
+//                if (pos != 0) {
+//                    outRect.top = ITEM_MARGIN
+//                }
+//                if (pos != parent.adapter!!.itemCount - 1) {
+//                    outRect.bottom = ITEM_MARGIN
+//                }
+                outRect.top = ITEM_MARGIN
             }
         })
         layoutManager = LinearLayoutManager(this)
@@ -231,15 +236,18 @@ class SearchActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: TitleViewHolder, pos: Int) {
+            val item = data[pos]
             Glide
                 .with(this@SearchActivity)
-                .load(provider.getGlideUrl(data[pos].image ?: ""))
+                .load(provider.getGlideUrl(item.image ?: ""))
+                .placeholder(R.drawable.img)
+                .error(R.drawable.placeholder)
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
-            val title = data[pos].title
-            val isFavourite = titleStorage.infoList.contains(data[pos])
+            val title = item.title
+            val isFavourite = titleStorage.infoList.contains(item)
             holder.name.text = title
-            holder.details.text = data[pos].details
+            holder.details.text = item.details
             if (isFavourite) {
                 holder.view.setBackgroundColor(resources.getColor(R.color.colorHighlight))
             } else {
@@ -252,17 +260,37 @@ class SearchActivity : AppCompatActivity() {
                         message(text = "Do you like to add '$title' to your watching list?")
                         positiveButton(text = "Yes") {
                             titleStorage.update {
-                                it.add(TitleStorageEntry(data[pos], providerName))
+                                it.add(TitleStorageEntry(item, providerName))
                                 it.sort()
                             }
                             toast(this@SearchActivity, "Added '$title' to watch list")
-                            adapter.notifyItemChanged(pos)
+                            adapter.notifyItemChanged(holder.adapterPosition)
                         }
                         negativeButton(text = "No")
                     }
                 } else {
-
+                    val episodesIntent = Intent(this@SearchActivity, EpisodeListActivity::class.java)
+                    episodesIntent.putExtra(EpisodeListActivity.ARG, title)
+                    startActivity(episodesIntent)
                 }
+            }
+            holder.view.setOnLongClickListener {
+                if (isFavourite) {
+                    MaterialDialog(this@SearchActivity).show {
+                        title(text = "Remove")
+                        message(text = "Remove '$title' from your watching list?")
+                        positiveButton(text = "Yes") {
+                            titleStorage.update {
+                                it.remove(titleStorage.findByName(title))
+                            }
+                            toast(this@SearchActivity,"'$title' removed")
+                            adapter.notifyItemChanged(holder.adapterPosition)
+                        }
+                        negativeButton(text = "No")
+                    }
+                    return@setOnLongClickListener true
+                }
+                false
             }
         }
 

@@ -18,6 +18,7 @@ import android.widget.TextView
 import androidx.appcompat.app.ActionBar
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.afollestad.materialdialogs.MaterialDialog
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.example.animewatcher.api.provider.AnimePahe
@@ -30,8 +31,7 @@ import com.karumi.dexter.Dexter
 import com.karumi.dexter.listener.PermissionDeniedResponse
 import com.karumi.dexter.listener.single.BasePermissionListener
 import com.mikepenz.iconics.view.IconicsImageButton
-import com.mikepenz.iconics.view.IconicsImageView
-import jp.wasabeef.recyclerview.animators.LandingAnimator
+import jp.wasabeef.recyclerview.animators.ScaleInAnimator
 import kotlinx.coroutines.*
 import kotlin.collections.ArrayList
 
@@ -84,13 +84,14 @@ class TitleListActivity : AppCompatActivity() {
         searchButton = actionBarView.findViewById(R.id.button_search)
         searchButton.setOnClickListener {
             val searchIntent = Intent(this, SearchActivity::class.java)
+            searchIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
             startActivity(searchIntent)
         }
 
         loadingView = findViewById(R.id.loading)
         loadingText = findViewById(R.id.loading_text)
         recyclerView = findViewById(R.id.recycler_view)
-        recyclerView.itemAnimator = LandingAnimator()
+        recyclerView.itemAnimator = ScaleInAnimator()
         recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
             override fun getItemOffsets(
                 outRect: Rect,
@@ -98,13 +99,14 @@ class TitleListActivity : AppCompatActivity() {
                 parent: RecyclerView,
                 state: RecyclerView.State
             ) {
-                val pos = parent.getChildAdapterPosition(view)
-                if (pos != 0) {
-                    outRect.top = ITEM_MARGIN
-                }
-                if (pos != parent.childCount - 1) {
-                    outRect.bottom = ITEM_MARGIN
-                }
+//                val pos = parent.getChildAdapterPosition(view)
+//                if (pos != 0) {
+//                    outRect.top = ITEM_MARGIN
+//                }
+//                if (pos != parent.adapter!!.itemCount - 1) {
+//                    outRect.bottom = ITEM_MARGIN
+//                }
+                outRect.top = ITEM_MARGIN
             }
         })
         layoutManager = LinearLayoutManager(this)
@@ -180,18 +182,37 @@ class TitleListActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: TitleEntryViewHolder, pos: Int) {
+            val item = data[pos]
             Glide
                 .with(this@TitleListActivity)
-                .load(data[pos].info.image)
+                .load(item.info.image)
+                .placeholder(R.drawable.img)
+                .error(R.drawable.placeholder)
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
-            val title = data[pos].info.title
+            val title = item.info.title
             holder.name.text = title
-            holder.details.text = data[pos].provider
+            holder.details.text = item.provider
             holder.view.setOnClickListener {
                 val episodesIntent = Intent(this@TitleListActivity, EpisodeListActivity::class.java)
                 episodesIntent.putExtra(EpisodeListActivity.ARG, title)
                 startActivity(episodesIntent)
+            }
+            holder.view.setOnLongClickListener {
+                MaterialDialog(this@TitleListActivity).show {
+                    title(text = "Remove")
+                    message(text = "Remove '$title' from your watching list?")
+                    positiveButton(text = "Yes") {
+                        titleStorage.update {
+                            it.remove(item)
+                        }
+                        titleData.remove(item)
+                        Util.toast(this@TitleListActivity,"'$title' removed")
+                        adapter.notifyItemRemoved(holder.adapterPosition)
+                    }
+                    negativeButton(text = "No")
+                }
+                true
             }
         }
 
