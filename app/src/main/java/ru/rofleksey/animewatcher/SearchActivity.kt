@@ -8,6 +8,7 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,9 +22,11 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.list.listItems
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.github.ybq.android.spinkit.SpinKitView
+import com.jakewharton.processphoenix.ProcessPhoenix
 import com.mikepenz.iconics.view.IconicsImageButton
 import jp.wasabeef.recyclerview.animators.FadeInAnimator
 import kotlinx.coroutines.*
@@ -38,10 +41,12 @@ import kotlin.system.measureTimeMillis
 
 
 class SearchActivity : AppCompatActivity() {
-    private companion object {
-        const val CROSSFADE_DURATION = 500
-        const val SEARCH_DELAY = 350L
-        const val ITEM_MARGIN = 30
+    companion object {
+        private const val TAG = "SearchActivity"
+        private const val CROSSFADE_DURATION = 500
+        private const val SEARCH_DELAY = 350L
+        private const val ITEM_MARGIN = 30
+        private const val SEARCH_HINT = "Search on"
     }
 
     private lateinit var sharedPreferences: SharedPreferences
@@ -73,10 +78,10 @@ class SearchActivity : AppCompatActivity() {
         val storageMeasure = measureTimeMillis {
             titleStorage = TitleStorage.load(sharedPreferences)
         }
-        println("titleStorage loaded in $storageMeasure ms")
+        Log.v(TAG, "titleStorage loaded in $storageMeasure ms")
         imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
 
-        providerName = sharedPreferences.getString("provider", ProviderFactory.ANIMEPAHE)
+        providerName = sharedPreferences.getString("provider", ProviderFactory.DEFAULT)
             ?: ProviderFactory.ANIMEPAHE
         provider = ProviderFactory.get(providerName)
 
@@ -96,7 +101,7 @@ class SearchActivity : AppCompatActivity() {
         supportActionBar?.setDisplayShowCustomEnabled(true)
 
         searchView.requestFocus()
-        searchView.hint = "Search on $providerName"
+        searchView.hint = "$SEARCH_HINT $providerName"
 
         buttonBack.setOnClickListener {
             searchDebounces.stop()
@@ -121,53 +126,52 @@ class SearchActivity : AppCompatActivity() {
                     return
                 }
                 searchDebounces.attempt(Runnable {
-                    job = coroutineScope.launch {
-                        try {
-                            loadingView.visibility = View.VISIBLE
-                            val results = withContext(Dispatchers.IO) {
-                                provider.search(s.toString())
-                            }
-                            val oldData = titleData
-                            if (!isActive) {
-                                return@launch
-                            }
-                            val diff = withContext(Dispatchers.Default) {
-                                DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-                                    override fun areItemsTheSame(
-                                        oldPos: Int,
-                                        newPos: Int
-                                    ): Boolean =
-                                        oldData[oldPos].title == results[newPos].title
-
-                                    override fun getOldListSize(): Int = oldData.size
-
-                                    override fun getNewListSize(): Int = results.size
-
-                                    override fun areContentsTheSame(
-                                        oldPos: Int,
-                                        newPos: Int
-                                    ): Boolean = oldData[oldPos] == results[newPos]
-                                }, true)
-                            }
-                            if (!isActive) {
-                                return@launch
-                            }
-                            titleData.clear()
-                            titleData.addAll(results)
-                            diff.dispatchUpdatesTo(adapter)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        } finally {
-                            loadingView.visibility = View.INVISIBLE
-                        }
-                    }
+                    job = runSearch(s.toString())
                 })
-
             }
 
         })
         buttonProviders.setOnClickListener {
-            toast(this, "Animepahe is the only provider (not yet implemented)")
+            MaterialDialog(this@SearchActivity).show {
+                title(text = "Select provider")
+                listItems(R.array.providers) { dialog, index, text ->
+                    searchDebounces.stop()
+                    job?.cancel()
+                    when (index) {
+                        0 -> {
+                            providerName = ProviderFactory.ANIMEPAHE
+                            sharedPreferences.edit().putString("provider", providerName).commit()
+                            toast(this@SearchActivity, "Switching to AnimePahe")
+                            ProcessPhoenix.triggerRebirth(this@SearchActivity)
+                        }
+                        1 -> {
+//                            providerName = ProviderFactory.ANIMEDUB
+//                            provider = ProviderFactory.get(providerName)
+//                            toast(this@SearchActivity, "Using AnimeDub")
+                            toast(this@SearchActivity, "Is not yet implemented")
+                            return@listItems
+                        }
+                        2 -> {
+                            providerName = ProviderFactory.GOGOANIME
+                            provider = ProviderFactory.get(providerName)
+                            toast(this@SearchActivity, "Using GogoAnime")
+                        }
+                        else -> {
+                            toast(this@SearchActivity, "ERROR: INVALID PROVIDER")
+                            return@listItems
+                        }
+                    }
+                    titleData.clear()
+                    adapter.notifyDataSetChanged()
+                    sharedPreferences.edit().putString("provider", providerName).apply()
+                    searchView.hint = "$SEARCH_HINT $providerName"
+                    searchDebounces.attempt(Runnable {
+                        job = runSearch(searchView.text.toString())
+                    })
+                    dialog.dismiss()
+                }
+                negativeButton(text = "No")
+            }
         }
 
         loadingView = findViewById(R.id.loading)
@@ -201,6 +205,49 @@ class SearchActivity : AppCompatActivity() {
         searchDebounces.stop()
         job?.cancel()
         super.onDestroy()
+    }
+
+    fun runSearch(s: String): Job {
+        return coroutineScope.launch {
+            try {
+                loadingView.visibility = View.VISIBLE
+                val results = withContext(Dispatchers.IO) {
+                    provider.search(s)
+                }
+                val oldData = titleData
+                if (!isActive) {
+                    return@launch
+                }
+                val diff = withContext(Dispatchers.Default) {
+                    DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                        override fun areItemsTheSame(
+                            oldPos: Int,
+                            newPos: Int
+                        ): Boolean =
+                            oldData[oldPos].title == results[newPos].title
+
+                        override fun getOldListSize(): Int = oldData.size
+
+                        override fun getNewListSize(): Int = results.size
+
+                        override fun areContentsTheSame(
+                            oldPos: Int,
+                            newPos: Int
+                        ): Boolean = oldData[oldPos] == results[newPos]
+                    }, true)
+                }
+                if (!isActive) {
+                    return@launch
+                }
+                titleData.clear()
+                titleData.addAll(results)
+                diff.dispatchUpdatesTo(adapter)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                loadingView.visibility = View.INVISIBLE
+            }
+        }
     }
 
     private class TitleViewHolder(

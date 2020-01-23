@@ -4,10 +4,12 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Rect
 import android.os.Bundle
 import android.os.Environment
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -31,11 +33,14 @@ import com.karumi.dexter.listener.PermissionDeniedResponse
 import com.karumi.dexter.listener.PermissionGrantedResponse
 import com.karumi.dexter.listener.single.BasePermissionListener
 import jp.wasabeef.glide.transformations.BlurTransformation
+import jp.wasabeef.glide.transformations.gpu.PixelationFilterTransformation
 import jp.wasabeef.recyclerview.animators.LandingAnimator
 import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
 import ru.rofleksey.animewatcher.api.model.Quality
+import ru.rofleksey.animewatcher.api.model.StorageAction
+import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
 import ru.rofleksey.animewatcher.api.storage.StorageLocator
 import ru.rofleksey.animewatcher.storage.TitleStorage
@@ -49,6 +54,7 @@ import kotlin.coroutines.suspendCoroutine
 
 class EpisodeListActivity : AppCompatActivity() {
     companion object {
+        private const val TAG = "EpisodeListActivity"
         private const val CROSSFADE_DURATION = 500
         private const val CROSSFADE_DURATION_BACKGROUND = 800
         private const val ITEM_MARGIN = 25
@@ -192,7 +198,7 @@ class EpisodeListActivity : AppCompatActivity() {
                 } else {
                     titleEntry.cachedEpisodeList
                 }
-                println("titleEntry.lastEpisodeNumber = ${titleEntry.lastEpisodeNumber}")
+                Log.v(TAG, "titleEntry.lastEpisodeNumber = ${titleEntry.lastEpisodeNumber}")
                 episodeData.addAll(episodes)
                 if (firstTime) {
                     titleEntry.cachedEpisodeList.addAll(episodes)
@@ -238,31 +244,47 @@ class EpisodeListActivity : AppCompatActivity() {
         }
     }
 
-    private fun presentLinkToTheUser(episodeName: String, link: String) {
-        MaterialDialog(this).show {
-            title(text = "Action")
-            message(text = "What do you want to do with #$episodeName ?")
-            positiveButton(text = "watch via VLC") {
-                openInVlc(this@EpisodeListActivity, link)
-            }
-            negativeButton(text = "download") {
-                val downloadRequest = DownloadManager.Request(link.toUri())
-                val downloadTitle = "${titleEntry.info.title}_${episodeName}.mp4"
-                val description = "Downloading episode #$episodeName of ${titleEntry.info.title}"
-                downloadRequest.setTitle(downloadTitle)
-                downloadRequest.setDescription(description)
-                downloadRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                downloadRequest.setVisibleInDownloadsUi(true)
-                downloadRequest.setDestinationInExternalPublicDir(
-                    Environment.DIRECTORY_DOWNLOADS,
-                    sanitizeForFileName(downloadTitle)
-                )
-                val taskId = downloadManager.enqueue(downloadRequest)
-//                titleEntry.downloadTasks[number] = taskId
-//                titleStorage.save()
-                toast(context, description)
+    private fun download(episodeName: String, link: String) {
+        val downloadTitle = "${titleEntry.info.title}_${episodeName}.mp4"
+        val fileName = sanitizeForFileName(downloadTitle)
+        val downloadRequest = DownloadManager.Request(link.toUri())
+        val description = "Downloading episode #$episodeName of ${titleEntry.info.title}"
+        downloadRequest.setTitle(downloadTitle)
+        downloadRequest.setDescription(description)
+        downloadRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        downloadRequest.setVisibleInDownloadsUi(true)
+        downloadRequest.setDestinationInExternalPublicDir(
+            Environment.DIRECTORY_DOWNLOADS,
+            fileName
+        )
+        val taskId = downloadManager.enqueue(downloadRequest)
+        toast(this, description)
+    }
+
+    private fun openDefault(link: String) {
+        val browserIntent = Intent(Intent.ACTION_VIEW, link.toUri())
+        startActivity(browserIntent)
+    }
+
+    private fun presentLinkToTheUser(episodeName: String, result: StorageResult) {
+        when (result.action) {
+            StorageAction.DOWNLOAD_ONLY -> download(episodeName, result.link)
+            StorageAction.CUSTOM_ONLY -> openDefault(result.link)
+            else -> MaterialDialog(this).show {
+                title(text = "Action")
+                message(text = "What do you want to do with #$episodeName ?")
+                positiveButton(text = "download") {
+                    download(episodeName, result.link)
+                }
+                neutralButton(text = "open in VLC") {
+                    openInVlc(this@EpisodeListActivity, result.link)
+                }
+                negativeButton(text = "custom") {
+                    openDefault(result.link)
+                }
             }
         }
+
     }
 
     override fun onDestroy() {
@@ -302,10 +324,14 @@ class EpisodeListActivity : AppCompatActivity() {
             val item = data[pos]
             Glide
                 .with(this@EpisodeListActivity)
-                .load(provider.getGlideUrl(item.image ?: ""))
+                .load(provider.getGlideUrl(item.image ?: titleEntry.info.image ?: ""))
                 .placeholder(R.drawable.img)
                 .error(R.drawable.placeholder)
-                //.apply(RequestOptions.circleCropTransform())
+                .run {
+                    if (item.image == null) {
+                        apply(bitmapTransform(PixelationFilterTransformation(50f)))
+                    } else this
+                }
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
             val episodeName = item.name
@@ -320,8 +346,16 @@ class EpisodeListActivity : AppCompatActivity() {
                         val links = withContext(Dispatchers.IO) {
                             provider.getStorageLinks(
                                 titleEntry.info,
-                                item
+                                item,
+                                Quality.q720
                             )
+                        }
+                        if (links.isEmpty()) {
+                            toast(
+                                this@EpisodeListActivity,
+                                "No links retrieved!"
+                            )
+                            return@launch
                         }
                         suspendCoroutine<Unit> { cont ->
                             Dexter.withActivity(this@EpisodeListActivity)
@@ -335,28 +369,31 @@ class EpisodeListActivity : AppCompatActivity() {
                                     override fun onPermissionDenied(response: PermissionDeniedResponse?) {
                                         super.onPermissionDenied(response)
                                         toast(this@EpisodeListActivity, "Permission denied")
-                                        cont.resumeWithException(Exception("Permision denied"))
+                                        cont.resumeWithException(Exception("Permission denied"))
                                     }
                                 })
                                 .check()
                         }
-                        val link = links[Quality.q720]
-                        if (link != null) {
-                            val storage = StorageLocator.locate(link)
-                            if (storage != null) {
-                                val streamLink =
-                                    withContext(Dispatchers.IO) { storage.extractDownload(link) }
-                                println(streamLink)
-                                presentLinkToTheUser(episodeName, streamLink)
-                            } else {
-                                toast(
-                                    this@EpisodeListActivity,
-                                    "Can't determine storage: $link"
-                                )
-                            }
-                        } else {
-                            toast(this@EpisodeListActivity, "Can't find 720p link: $links")
+                        val linksAndStorages = links.map {
+                            Pair(it, StorageLocator.locate(it))
+                        }.filter {
+                            it.second != null
+                        }.sortedBy {
+                            it.second!!.score()
                         }
+                        if (linksAndStorages.isEmpty()) {
+                            toast(
+                                this@EpisodeListActivity,
+                                "Can't determine links' storages"
+                            )
+                            return@launch
+                        }
+                        val storage = linksAndStorages.last().second!!
+                        Log.v(TAG, "Using ${storage.name()}")
+                        val storageResult =
+                            withContext(Dispatchers.IO) { storage.extract(linksAndStorages.last().first) }
+                        Log.v(TAG, "storageLink - ${storageResult.link}")
+                        presentLinkToTheUser(episodeName, storageResult)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     } finally {

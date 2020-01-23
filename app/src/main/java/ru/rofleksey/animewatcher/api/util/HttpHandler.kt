@@ -1,5 +1,6 @@
 package ru.rofleksey.animewatcher.api.util
 
+import android.util.Log
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
 import okhttp3.HttpUrl
@@ -13,6 +14,7 @@ import kotlin.coroutines.resumeWithException
 
 class HttpHandler {
     companion object {
+        private const val TAG = "HttpHandler"
         val instance: HttpHandler by lazy { HOLDER.INSTANCE }
     }
 
@@ -37,7 +39,7 @@ class HttpHandler {
     }
 
     fun saveCookies(url: HttpUrl, cookies: List<Cookie>) {
-        println("httpClient::saveCookies for $url - $cookies")
+        Log.v(TAG, "httpClient::saveCookies for $url - $cookies")
         cookies.forEach {
             cookieJar.setCookie(url.toString(), it.name, it.value)
         }

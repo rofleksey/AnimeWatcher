@@ -1,10 +1,12 @@
 package ru.rofleksey.animewatcher.api.storage
 
+import android.util.Log
 import okhttp3.HttpUrl
 import okhttp3.MultipartBody
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
-import ru.rofleksey.animewatcher.api.model.StorageType
+import ru.rofleksey.animewatcher.api.model.StorageAction
+import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.unpackers.PACKERUnpacker
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
@@ -13,9 +15,11 @@ import java.net.URI
 
 class KwikStorage private constructor() : Storage {
     companion object {
+        private const val TAG = "Kwik"
+        const val NAME = "kwik"
+        const val SCORE = 50
         val instance: KwikStorage by lazy { HOLDER.INSTANCE }
-        val sourceRegex = Regex("const source='([^']+)'")
-        val downloadRegex = Regex("download:'([^']+)'")
+        private val downloadRegex = Regex("download:'([^']+)'")
     }
 
     private object HOLDER {
@@ -27,22 +31,9 @@ class KwikStorage private constructor() : Storage {
         return match.groupValues[1]
     }
 
-    override suspend fun extractStream(url: String): String {
-        val uri = URI(url)
-        return HttpHandler.instance.executeDirect({
-            this.scheme(uri.scheme).host(uri.host).addPathSegments(uri.path)
-        }, { this.addHeader("Referer", url) }, {
-            val doc = Jsoup.parse(this.actualBody())
-            val script = doc.selectFirst("body > script:nth-child(6)")
-            val scriptText = script.data()
-            val unpacked = PACKERUnpacker.unpack(scriptText)
-            getRegexValue(unpacked, sourceRegex)
-        })
-    }
-
     private data class DownloadExtraction(val link: String, val token: String)
 
-    override suspend fun extractDownload(url: String): String {
+    override suspend fun extract(url: String): StorageResult {
         val uri = URI(url)
         // E
         val downloadKwikSite = HttpHandler.instance.executeDirect({
@@ -52,11 +43,11 @@ class KwikStorage private constructor() : Storage {
             val script = doc.selectFirst("body > script:nth-child(6)")
             val scriptText = script.data()
             val unpacked = PACKERUnpacker.unpack(scriptText)
-            println(unpacked)
+            Log.v(TAG, unpacked)
             getRegexValue(unpacked, downloadRegex)
         })
         // F
-        println("downloadKwikSite - $downloadKwikSite")
+        Log.v(TAG, "downloadKwikSite - $downloadKwikSite")
         val (link, token) = HttpHandler.instance.executeDirect({
             this.scheme(uri.scheme).host(uri.host).addPathSegments(downloadKwikSite)
         }, { this.addHeader("Referer", url) }, {
@@ -83,11 +74,16 @@ class KwikStorage private constructor() : Storage {
                     .build()
             ).addHeader("Referer", fUrl.toString())
         }, {
-            this.request.url.toString()
+            val result = this.request.url.toString()
+            StorageResult(result, StorageAction.ANY)
         })
     }
 
-    override fun storageType(): StorageType {
-        return StorageType.BOTH
+    override fun score(): Int {
+        return SCORE
+    }
+
+    override fun name(): String {
+        return NAME
     }
 }

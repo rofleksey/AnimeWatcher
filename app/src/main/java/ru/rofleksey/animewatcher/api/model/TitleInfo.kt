@@ -19,6 +19,10 @@ class TitleInfo(
         fields[name] = value
     }
 
+    fun has(name: String): Boolean {
+        return fields.containsKey(name)
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

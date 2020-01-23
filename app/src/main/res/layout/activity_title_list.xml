@@ -14,6 +14,7 @@
         android:scrollbars="vertical"
         android:elevation="1dp"
         android:visibility="gone"
+        android:gravity="start"
         app:layout_constrainedHeight="true"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -25,10 +26,10 @@
         android:id="@+id/loading_text"
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
-        android:textSize="14sp"
-        android:fontFamily="@font/overpass_mono"
-        android:background="@color/colorGray"
+        android:textSize="13sp"
+        android:fontFamily="@font/death_note"
         android:textColor="@color/colorWhite"
+        android:gravity="start"
         app:layout_constrainedWidth="true"
         app:layout_constraintStart_toEndOf="@id/loading"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -41,10 +42,10 @@
         android:layout_width="100dp"
         android:layout_height="100dp"
         android:elevation="3dp"
+        android:layout_marginStart="5dp"
         app:SpinKit_Color="@color/colorWhite"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/loading_text"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"/>
+        app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

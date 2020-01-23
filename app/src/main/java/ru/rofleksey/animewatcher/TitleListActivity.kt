@@ -31,6 +31,7 @@ import ru.rofleksey.animewatcher.storage.TitleStorage
 import ru.rofleksey.animewatcher.storage.TitleStorageEntry
 import ru.rofleksey.animewatcher.util.Util
 
+
 class TitleListActivity : AppCompatActivity() {
     companion object {
         private const val CROSSFADE_DURATION = 500
@@ -62,6 +63,7 @@ class TitleListActivity : AppCompatActivity() {
 
         sharedPreferences = getSharedPreferences("animewatcher", Context.MODE_PRIVATE)
         //sharedPreferences.edit().clear().commit()
+        val providerName = sharedPreferences.getString("provider", ProviderFactory.DEFAULT)
         titleStorage = TitleStorage.load(sharedPreferences)
         imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
 
@@ -111,8 +113,12 @@ class TitleListActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
 
         job = coroutineScope.launch {
-            ProviderFactory.init(this@TitleListActivity, sharedPreferences) {
-                loadingText.text = it
+            if (providerName == ProviderFactory.ANIMEPAHE ||
+                titleStorage.entryList.any { it.provider == ProviderFactory.ANIMEPAHE }
+            ) {
+                ProviderFactory.init(this@TitleListActivity, sharedPreferences) {
+                    loadingText.text = it
+                }
             }
             titleData.clear()
             titleData.addAll(titleStorage.entryList)

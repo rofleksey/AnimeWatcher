@@ -7,6 +7,7 @@ import ru.rofleksey.animewatcher.api.model.TitleInfo
 
 class TitleStorage private constructor(val prefs: SharedPreferences) {
     companion object {
+        private const val TAG = "TitleStorage"
         fun load(prefs: SharedPreferences): TitleStorage {
             return TitleStorage(prefs).also { it.reload() }
         }
@@ -38,7 +39,7 @@ class TitleStorage private constructor(val prefs: SharedPreferences) {
 
     fun save() {
         val json = gson.toJson(data)
-        println("json - $json")
+        //Log.v(TAG, "json - $json")
         prefs.edit().putString("title_storage", json).apply()
     }
 

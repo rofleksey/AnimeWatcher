@@ -2,6 +2,7 @@ package ru.rofleksey.animewatcher.api.util
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
 import android.webkit.WebView
@@ -10,6 +11,8 @@ import ru.rofleksey.animewatcher.util.Util
 
 class WebViewWrapper private constructor(val webView: WebView) {
     companion object {
+        private const val TAG = "WebViewWrapper"
+
         fun with(context: Context): WebViewWrapper {
             val webView = WebView(context)
             webView.setWillNotDraw(true)
@@ -30,7 +33,7 @@ class WebViewWrapper private constructor(val webView: WebView) {
 
     fun getCookies(url: String, domain: String): List<Cookie> {
         val cookieString: String = CookieManager.getInstance().getCookie(url)
-        println("cookieString = $cookieString")
+        Log.v(TAG, "cookieString = $cookieString")
         val match = cookieRegex.findAll(cookieString)
         return match.map {
             val cookieKey = it.groupValues[1]

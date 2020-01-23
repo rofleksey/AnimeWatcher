@@ -1,9 +1,9 @@
 package ru.rofleksey.animewatcher.api
 
-import ru.rofleksey.animewatcher.api.model.StorageType
+import ru.rofleksey.animewatcher.api.model.StorageResult
 
 interface Storage {
-    suspend fun extractStream(url: String): String
-    suspend fun extractDownload(url: String): String
-    fun storageType(): StorageType
+    suspend fun extract(url: String): StorageResult
+    fun score(): Int
+    fun name(): String
 }

@@ -2,9 +2,11 @@ package ru.rofleksey.animewatcher.api
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.bumptech.glide.load.model.GlideUrl
+import com.bumptech.glide.load.model.LazyHeaders
 import okhttp3.Cookie
 import okhttp3.HttpUrl
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
@@ -13,6 +15,7 @@ import ru.rofleksey.animewatcher.api.model.Quality
 import ru.rofleksey.animewatcher.api.model.TitleInfo
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.WebViewWrapper
+import ru.rofleksey.animewatcher.util.Util
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -22,30 +25,53 @@ interface AnimeProvider {
     suspend fun getEpisodeList(titleInfo: TitleInfo, page: Int): List<EpisodeInfo>
     suspend fun getStorageLinks(
         titleInfo: TitleInfo,
-        episodeInfo: EpisodeInfo
-    ): Map<Quality, String>
+        episodeInfo: EpisodeInfo,
+        prefQuality: Quality
+    ): List<String>
 
-    suspend fun getAllTitles(): List<String>?
     suspend fun init(
         context: Context,
         prefs: SharedPreferences,
         updateStatus: (title: String) -> Unit
     )
 
-    fun getGlideUrl(url: String): GlideUrl?
     fun stats(): ProviderStats
     fun clearCache()
 
     suspend fun getAllEpisodes(titleInfo: TitleInfo): List<EpisodeInfo> {
-        val result = mutableListOf<EpisodeInfo>()
+        val result = ArrayList<EpisodeInfo>()
         for (i in 0..Int.MAX_VALUE) {
             val page = getEpisodeList(titleInfo, i)
+            Log.v("AnimeProvider", "page - $page")
             if (page.isEmpty()) {
                 break
             }
             result.addAll(page)
         }
-        return result
+        val stats = stats()
+        return if (stats.episodesDesc) {
+            result.reversed()
+        } else {
+            result
+        }
+    }
+
+    fun getGlideUrl(url: String): GlideUrl? {
+        return try {
+            val cookies = HttpHandler.instance.getCookies(url).joinToString("; ") {
+                "${it.name}=${it.value}"
+            }
+            Log.v("AnimeProvider", "glide cookies for $url: $cookies")
+            GlideUrl(
+                url,
+                LazyHeaders.Builder()
+                    .addHeader("User-Agent", Util.USER_AGENT)
+                    .addHeader("Cookie", cookies)
+                    .build()
+            )
+        } catch (e: IllegalArgumentException) {
+            null
+        }
     }
 
     suspend fun bypassCloudfare(context: Context, url: HttpUrl) {
@@ -60,7 +86,7 @@ interface AnimeProvider {
                             result.addAll(webWrapper.getCookies(url, "animepahe.com"))
                             cont.resume(Unit)
                         } else {
-                            println("title = ${webWrapper.webView.title}")
+                            Log.v("AnimeProvider", "page title = ${webWrapper.webView.title}")
                         }
                     } catch (e: Throwable) {
                         cont.resumeWithException(e)

@@ -9,5 +9,11 @@
 
     <string name="menu_search">Search</string>
     <string name="menu_tools">Tools</string>
-    <string name="enter_search_request_here">Search here</string>
+    <string name="search_request_here">Search here</string>
+
+    <string-array name="providers">
+        <item>AnimePahe</item>
+        <item>AnimeDub (not implemented)</item>
+        <item>GogoAnime</item>
+    </string-array>
 </resources>

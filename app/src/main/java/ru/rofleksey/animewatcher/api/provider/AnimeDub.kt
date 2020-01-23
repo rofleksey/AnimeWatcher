@@ -2,7 +2,7 @@ package ru.rofleksey.animewatcher.api.provider
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.bumptech.glide.load.model.GlideUrl
+import android.util.Log
 import com.google.gson.Gson
 import okhttp3.HttpUrl
 import okhttp3.MultipartBody
@@ -17,6 +17,7 @@ import ru.rofleksey.animewatcher.api.util.actualBody
 
 class AnimeDub : AnimeProvider {
     companion object {
+        private const val TAG = "AnimeDub"
         private const val HOST = "animedub.ru"
         private val gson = Gson()
     }
@@ -46,15 +47,21 @@ class AnimeDub : AnimeProvider {
 
             val bodies = doc.select("a.mov-t.nowrap + .mov.clearfix")
             val images = bodies.map { it.selectFirst("img").attr("src") }
-            val details = bodies.map {
+            val details: List<Map<String, String>> = bodies.map {
                 val map = mutableMapOf<String, String>()
-                it.select(".movie-lines li").forEach { li ->
-                    map[li.selectFirst(".ml-label").text()] =
-                        li.selectFirst(".ml-desc").text()
+                try {
+                    it.select(".movie-lines li").forEach { li ->
+                        map[li.selectFirst(".ml-label").text()] =
+                            li.selectFirst(".ml-desc").text()
+                    }
+                } catch (e: Exception) {
+                    //TODO: what happens here?
                 }
                 map
             }
-            println(details)
+
+
+            Log.v(TAG, "details - $details")
             val result = mutableListOf<TitleInfo>()
             for (i in 0 until bodies.size) {
                 result.add(
@@ -77,18 +84,15 @@ class AnimeDub : AnimeProvider {
     }
 
     override suspend fun getEpisodeList(titleInfo: TitleInfo, page: Int): List<EpisodeInfo> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        TODO("not implemented")
     }
 
     override suspend fun getStorageLinks(
         titleInfo: TitleInfo,
-        episodeInfo: EpisodeInfo
-    ): Map<Quality, String> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    override suspend fun getAllTitles(): List<String>? {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        episodeInfo: EpisodeInfo,
+        prefQuality: Quality
+    ): List<String> {
+        TODO("not implemented")
     }
 
     override suspend fun init(
@@ -96,18 +100,14 @@ class AnimeDub : AnimeProvider {
         prefs: SharedPreferences,
         updateStatus: (title: String) -> Unit
     ) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    override fun getGlideUrl(url: String): GlideUrl? {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        TODO("not implemented")
     }
 
     override fun stats(): ProviderStats {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        TODO("not implemented")
     }
 
     override fun clearCache() {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        TODO("not implemented")
     }
 }
