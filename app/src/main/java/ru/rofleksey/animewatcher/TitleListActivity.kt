@@ -82,7 +82,7 @@ class TitleListActivity : AppCompatActivity() {
         searchButton = actionBarView.findViewById(R.id.button_search)
         searchButton.setOnClickListener {
             val searchIntent = Intent(this, SearchActivity::class.java)
-            searchIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+            //searchIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
             startActivity(searchIntent)
         }
 
@@ -177,28 +177,28 @@ class TitleListActivity : AppCompatActivity() {
             Glide
                 .with(this@TitleListActivity)
                 .load(item.info.image)
-                .placeholder(R.drawable.img)
+                .placeholder(R.drawable.zero2)
                 .error(R.drawable.placeholder)
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
-            val title = item.info.title
-            holder.name.text = title
+            holder.name.text = item.info.title
             holder.details.text = item.provider
             holder.view.setOnClickListener {
                 val episodesIntent = Intent(this@TitleListActivity, EpisodeListActivity::class.java)
-                episodesIntent.putExtra(EpisodeListActivity.ARG, title)
+                episodesIntent.putExtra(EpisodeListActivity.ARG_TITLE, item.info.title)
+                episodesIntent.putExtra(EpisodeListActivity.ARG_PROVIDER, item.provider)
                 startActivity(episodesIntent)
             }
             holder.view.setOnLongClickListener {
                 MaterialDialog(this@TitleListActivity).show {
                     title(text = "Remove")
-                    message(text = "Remove '$title' from your watching list?")
+                    message(text = "Remove '${item.info.title}' from your watching list?")
                     positiveButton(text = "Yes") {
                         titleStorage.update {
                             it.remove(item)
                         }
                         titleData.remove(item)
-                        Util.toast(this@TitleListActivity, "'$title' removed")
+                        Util.toast(this@TitleListActivity, "'${item.info.title}' removed")
                         adapter.notifyItemRemoved(holder.adapterPosition)
                     }
                     negativeButton(text = "No")

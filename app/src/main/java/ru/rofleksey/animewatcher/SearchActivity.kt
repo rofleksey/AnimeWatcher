@@ -143,13 +143,12 @@ class SearchActivity : AppCompatActivity() {
                             sharedPreferences.edit().putString("provider", providerName).commit()
                             toast(this@SearchActivity, "Switching to AnimePahe")
                             ProcessPhoenix.triggerRebirth(this@SearchActivity)
+                            return@listItems
                         }
                         1 -> {
-//                            providerName = ProviderFactory.ANIMEDUB
-//                            provider = ProviderFactory.get(providerName)
-//                            toast(this@SearchActivity, "Using AnimeDub")
-                            toast(this@SearchActivity, "Is not yet implemented")
-                            return@listItems
+                            providerName = ProviderFactory.ANIMEDUB
+                            provider = ProviderFactory.get(providerName)
+                            toast(this@SearchActivity, "Using AnimeDub")
                         }
                         2 -> {
                             providerName = ProviderFactory.GOGOANIME
@@ -284,12 +283,12 @@ class SearchActivity : AppCompatActivity() {
             Glide
                 .with(this@SearchActivity)
                 .load(provider.getGlideUrl(item.image ?: ""))
-                .placeholder(R.drawable.img)
+                .placeholder(R.drawable.zero2)
                 .error(R.drawable.placeholder)
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
             val title = item.title
-            val isFavourite = titleStorage.infoList.contains(item)
+            val isFavourite = titleStorage.hasTitle(item.title, providerName)
             holder.name.text = title
             holder.details.text = item.details
             if (isFavourite) {
@@ -315,7 +314,8 @@ class SearchActivity : AppCompatActivity() {
                 } else {
                     val episodesIntent =
                         Intent(this@SearchActivity, EpisodeListActivity::class.java)
-                    episodesIntent.putExtra(EpisodeListActivity.ARG, title)
+                    episodesIntent.putExtra(EpisodeListActivity.ARG_TITLE, title)
+                    episodesIntent.putExtra(EpisodeListActivity.ARG_PROVIDER, providerName)
                     startActivity(episodesIntent)
                 }
             }
@@ -326,7 +326,7 @@ class SearchActivity : AppCompatActivity() {
                         message(text = "Remove '$title' from your watching list?")
                         positiveButton(text = "Yes") {
                             titleStorage.update {
-                                it.remove(titleStorage.findByName(title))
+                                it.remove(titleStorage.findByName(title, providerName))
                             }
                             toast(this@SearchActivity, "'$title' removed")
                             adapter.notifyItemChanged(holder.adapterPosition)

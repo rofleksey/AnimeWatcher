@@ -58,9 +58,7 @@ interface AnimeProvider {
 
     fun getGlideUrl(url: String): GlideUrl? {
         return try {
-            val cookies = HttpHandler.instance.getCookies(url).joinToString("; ") {
-                "${it.name}=${it.value}"
-            }
+            val cookies = HttpHandler.instance.getCookiesString(url)
             Log.v("AnimeProvider", "glide cookies for $url: $cookies")
             GlideUrl(
                 url,
@@ -74,7 +72,7 @@ interface AnimeProvider {
         }
     }
 
-    suspend fun bypassCloudfare(context: Context, url: HttpUrl) {
+    suspend fun bypassCloudflare(context: Context, url: HttpUrl) {
         val webWrapper = WebViewWrapper.with(context)
         val result: MutableList<Cookie> = mutableListOf()
         suspendCoroutine<Unit> { cont ->

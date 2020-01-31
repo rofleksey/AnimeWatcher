@@ -1,9 +1,10 @@
-package ru.rofleksey.animewatcher.api.storage
+package ru.rofleksey.animewatcher.api.storage.english
 
 import android.util.Log
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
+import ru.rofleksey.animewatcher.api.model.Quality
 import ru.rofleksey.animewatcher.api.model.StorageAction
 import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.util.ApiUtil
@@ -22,18 +23,20 @@ class VidStreamingStorage : Storage {
     }
 
     private object HOLDER {
-        val INSTANCE = VidStreamingStorage()
+        val INSTANCE =
+            VidStreamingStorage()
     }
 
-    override suspend fun extract(url: String): StorageResult {
+    override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
         val urlArg = ApiUtil.sanitizeScheme(url)
         Log.v(TAG, url)
         val redirect = HttpHandler.instance.executeDirect({
             urlArg.toHttpUrl().newBuilder()
         }, { this }, {
             val content = this.actualBody()
-            val match = sourceRegex.find(content) ?: throw IOException("can't match regex!")
-            match.groupValues[1]
+            ApiUtil.getRegex(content,
+                sourceRegex
+            )
         })
         return HttpHandler.instance.executeDirect({
             redirect.toHttpUrl().newBuilder()
@@ -52,11 +55,8 @@ class VidStreamingStorage : Storage {
         })
     }
 
-    override fun score(): Int {
-        return SCORE
-    }
-
-    override fun name(): String {
-        return NAME
-    }
+    override val score: Int
+        get() = SCORE
+    override val name: String
+        get() = NAME
 }

@@ -38,6 +38,12 @@ class HttpHandler {
         return cookieJar.cookieJar().loadForRequest(url.toHttpUrl())
     }
 
+    fun getCookiesString(url: String): String {
+        return getCookies(url).joinToString("; ") {
+            "${it.name}=${it.value}"
+        }
+    }
+
     fun saveCookies(url: HttpUrl, cookies: List<Cookie>) {
         Log.v(TAG, "httpClient::saveCookies for $url - $cookies")
         cookies.forEach {

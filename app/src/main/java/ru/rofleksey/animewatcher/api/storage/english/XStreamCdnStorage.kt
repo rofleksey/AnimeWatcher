@@ -1,4 +1,4 @@
-package ru.rofleksey.animewatcher.api.storage
+package ru.rofleksey.animewatcher.api.storage.english
 
 import android.util.Log
 import com.google.gson.JsonParser
@@ -6,8 +6,10 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
 import ru.rofleksey.animewatcher.api.Storage
+import ru.rofleksey.animewatcher.api.model.Quality
 import ru.rofleksey.animewatcher.api.model.StorageAction
 import ru.rofleksey.animewatcher.api.model.StorageResult
+import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 import java.io.IOException
@@ -15,6 +17,7 @@ import java.io.IOException
 class XStreamCdnStorage : Storage {
     companion object {
         private const val TAG = "XStreamCdn"
+        private const val UNAVAILABLE = "Sorry this file is unavailable: DMCA Takedown"
         const val NAME = "XStreamCdn"
         const val SCORE = 60
         val instance: XStreamCdnStorage by lazy { HOLDER.INSTANCE }
@@ -22,10 +25,11 @@ class XStreamCdnStorage : Storage {
     }
 
     private object HOLDER {
-        val INSTANCE = XStreamCdnStorage()
+        val INSTANCE =
+            XStreamCdnStorage()
     }
 
-    override suspend fun extract(url: String): StorageResult {
+    override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
         val httpUrl = url.toHttpUrl()
         val segments = ArrayList(httpUrl.pathSegments).map {
             if (it == "v") "f" else it
@@ -39,11 +43,15 @@ class XStreamCdnStorage : Storage {
             fUrl
         }, { this.addHeader("Referer", url) }, {
             val content = this.actualBody()
-            val match = postRegex.find(content) ?: throw IOException("can't match regex!")
+            if (content.contains(UNAVAILABLE)) {
+                throw IOException(UNAVAILABLE)
+            }
             HttpUrl.Builder()
                 .scheme(httpUrl.scheme)
                 .host(httpUrl.host)
-                .addPathSegments(match.groupValues[1].removePrefix("/"))
+                .addPathSegments(ApiUtil.getRegex(content,
+                    postRegex
+                ).removePrefix("/"))
                 .build()
         })
         Log.v(TAG, "postUrl = $postUrl")
@@ -51,11 +59,13 @@ class XStreamCdnStorage : Storage {
             postUrl.newBuilder()
         }, { this.addHeader("Referer", fUrl.toString()).post("".toRequestBody()) }, {
             val obj = JsonParser.parseString(this.actualBody()).asJsonObject
-            Log.v(TAG, "Response: $obj")
-            val data = obj.getAsJsonArray("data")
-            Log.v(TAG, "data = $data")
-            val first = data.get(0).asJsonObject
-            first.get("file").asString
+            val links = obj.getAsJsonArray("data").map {
+                val file = it.asJsonObject.get("file").asString
+                val qualityString = it.asJsonObject.get("label").asString
+                Pair(ApiUtil.strToQuality(qualityString), file)
+            }
+            Log.v(TAG, links.toString())
+            ApiUtil.pickQuality(links, prefQuality)
         })
         return HttpHandler.instance.executeDirect({
             redirectUrl.toHttpUrl().newBuilder()
@@ -64,11 +74,8 @@ class XStreamCdnStorage : Storage {
         })
     }
 
-    override fun score(): Int {
-        return SCORE
-    }
-
-    override fun name(): String {
-        return NAME
-    }
+    override val score: Int
+        get() = SCORE
+    override val name: String
+        get() = NAME
 }

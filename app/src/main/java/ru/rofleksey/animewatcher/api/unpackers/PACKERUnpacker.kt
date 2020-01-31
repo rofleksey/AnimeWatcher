@@ -48,7 +48,7 @@ class PACKERUnpacker {
             };
         """.trimIndent()
 
-        interface Packer {
+        private interface Packer {
             fun unpack(s: String): String
         }
 

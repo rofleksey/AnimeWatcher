@@ -12,8 +12,8 @@
     <string name="search_request_here">Search here</string>
 
     <string-array name="providers">
-        <item>AnimePahe</item>
-        <item>AnimeDub (not implemented)</item>
+        <item>AnimePahe (extremely slow)</item>
+        <item>AnimeDub (ru)</item>
         <item>GogoAnime</item>
     </string-array>
 </resources>

@@ -23,6 +23,8 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.callbacks.onDismiss
+import com.afollestad.materialdialogs.list.listItems
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions.bitmapTransform
@@ -59,7 +61,8 @@ class EpisodeListActivity : AppCompatActivity() {
         private const val CROSSFADE_DURATION_BACKGROUND = 800
         private const val ITEM_MARGIN = 25
         private const val COLUMN_COUNT = 3
-        const val ARG = "titleName"
+        const val ARG_TITLE = "titleName"
+        const val ARG_PROVIDER = "titleProvider"
     }
 
     private lateinit var sharedPreferences: SharedPreferences
@@ -90,8 +93,9 @@ class EpisodeListActivity : AppCompatActivity() {
         sharedPreferences = getSharedPreferences("animewatcher", Context.MODE_PRIVATE)
         titleStorage = TitleStorage.load(sharedPreferences)
 
-        val titleName = intent.getStringExtra(ARG) ?: ""
-        titleEntry = titleStorage.findByName(titleName)
+        val titleName = intent.getStringExtra(ARG_TITLE) ?: ""
+        val titleProvider = intent.getStringExtra(ARG_PROVIDER) ?: ""
+        titleEntry = titleStorage.findByName(titleName, titleProvider)
         providerName = titleEntry.provider
         provider = ProviderFactory.get(providerName)
 
@@ -244,11 +248,15 @@ class EpisodeListActivity : AppCompatActivity() {
         }
     }
 
-    private fun download(episodeName: String, link: String) {
+    private fun download(episodeName: String, result: StorageResult) {
         val downloadTitle = "${titleEntry.info.title}_${episodeName}.mp4"
         val fileName = sanitizeForFileName(downloadTitle)
-        val downloadRequest = DownloadManager.Request(link.toUri())
+        val downloadRequest = DownloadManager.Request(result.link.toUri())
         val description = "Downloading episode #$episodeName of ${titleEntry.info.title}"
+        for (entry in result.headers.entries) {
+            downloadRequest.addRequestHeader(entry.key, entry.value)
+            Log.v(TAG, "Setting header ${entry.key}=${entry.value}")
+        }
         downloadRequest.setTitle(downloadTitle)
         downloadRequest.setDescription(description)
         downloadRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -268,13 +276,13 @@ class EpisodeListActivity : AppCompatActivity() {
 
     private fun presentLinkToTheUser(episodeName: String, result: StorageResult) {
         when (result.action) {
-            StorageAction.DOWNLOAD_ONLY -> download(episodeName, result.link)
+            StorageAction.DOWNLOAD_ONLY -> download(episodeName, result)
             StorageAction.CUSTOM_ONLY -> openDefault(result.link)
             else -> MaterialDialog(this).show {
                 title(text = "Action")
                 message(text = "What do you want to do with #$episodeName ?")
                 positiveButton(text = "download") {
-                    download(episodeName, result.link)
+                    download(episodeName, result)
                 }
                 neutralButton(text = "open in VLC") {
                     openInVlc(this@EpisodeListActivity, result.link)
@@ -290,6 +298,75 @@ class EpisodeListActivity : AppCompatActivity() {
     override fun onDestroy() {
         job?.cancel()
         super.onDestroy()
+    }
+
+    private suspend fun process(episodeInfo: EpisodeInfo, askStorage: Boolean) {
+        val links = withContext(Dispatchers.IO) {
+            provider.getStorageLinks(
+                titleEntry.info,
+                episodeInfo,
+                Quality.q720
+            )
+        }
+        if (links.isEmpty()) {
+            throw Exception("No links retreived from $provider")
+        }
+        suspendCoroutine<Unit> { cont ->
+            Dexter.withActivity(this@EpisodeListActivity)
+                .withPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                .withListener(object : BasePermissionListener() {
+                    override fun onPermissionGranted(response: PermissionGrantedResponse?) {
+                        super.onPermissionGranted(response)
+                        cont.resume(Unit)
+                    }
+
+                    override fun onPermissionDenied(response: PermissionDeniedResponse?) {
+                        super.onPermissionDenied(response)
+                        toast(this@EpisodeListActivity, "Permission denied")
+                        cont.resumeWithException(Exception("Permission denied"))
+                    }
+                })
+                .check()
+        }
+        val linksAndStorages = links.map {
+            Pair(it, StorageLocator.locate(it))
+        }.filter {
+            it.second != null
+        }.sortedBy {
+            -it.second!!.score
+        }
+        if (linksAndStorages.isEmpty()) {
+            throw Exception("Failed to determine download method")
+        }
+        val index = if (!askStorage) {
+            0
+        } else {
+            val displayList = linksAndStorages.map { it.second!!.name }
+            var resumed = false
+            val index = suspendCoroutine<Int> { cont ->
+                MaterialDialog(this).show {
+                    listItems(items = displayList) { dialog, index, text ->
+                        resumed = true
+                        cont.resume(index)
+                        dialog.dismiss()
+                    }
+                    onDismiss {
+                        if (!resumed) {
+                            cont.resumeWithException(Exception("Dialog closed"))
+                        }
+                    }
+                }
+            }
+            index
+        }
+        val storage = linksAndStorages[index].second!!
+        val finalLink = linksAndStorages[index].first
+        Log.v(TAG, "Using ${storage.name}: $finalLink")
+        val storageResult = withContext(Dispatchers.IO) {
+            storage.extract(finalLink, Quality.q720)
+        }
+        Log.v(TAG, "storageLink - ${storageResult.link}")
+        presentLinkToTheUser(episodeInfo.name, storageResult)
     }
 
     private class EpisodeViewHolder(
@@ -320,86 +397,47 @@ class EpisodeListActivity : AppCompatActivity() {
             )
         }
 
+        private fun startJob(holder: EpisodeViewHolder, info: EpisodeInfo, askStorage: Boolean) {
+            job = coroutineScope.launch {
+                try {
+                    holder.loading.visibility = View.VISIBLE
+                    process(info, askStorage)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    Snackbar.make(refreshLayout, e.message ?: "Error", Snackbar.LENGTH_SHORT).show()
+                } finally {
+                    holder.loading.visibility = View.GONE
+                }
+            }
+        }
+
         override fun onBindViewHolder(holder: EpisodeViewHolder, pos: Int) {
             val item = data[pos]
             Glide
                 .with(this@EpisodeListActivity)
                 .load(provider.getGlideUrl(item.image ?: titleEntry.info.image ?: ""))
-                .placeholder(R.drawable.img)
+                .placeholder(R.drawable.zero2)
                 .error(R.drawable.placeholder)
                 .run {
                     if (item.image == null) {
-                        apply(bitmapTransform(PixelationFilterTransformation(50f)))
+                        apply(bitmapTransform(PixelationFilterTransformation(25f)))
                     } else this
                 }
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
-            val episodeName = item.name
-            holder.text.text = episodeName
+            holder.text.text = item.name
             holder.view.setOnClickListener {
                 if (holder.loading.visibility != View.GONE || job?.isActive != false) {
                     return@setOnClickListener
                 }
-                job = coroutineScope.launch {
-                    try {
-                        holder.loading.visibility = View.VISIBLE
-                        val links = withContext(Dispatchers.IO) {
-                            provider.getStorageLinks(
-                                titleEntry.info,
-                                item,
-                                Quality.q720
-                            )
-                        }
-                        if (links.isEmpty()) {
-                            toast(
-                                this@EpisodeListActivity,
-                                "No links retrieved!"
-                            )
-                            return@launch
-                        }
-                        suspendCoroutine<Unit> { cont ->
-                            Dexter.withActivity(this@EpisodeListActivity)
-                                .withPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                                .withListener(object : BasePermissionListener() {
-                                    override fun onPermissionGranted(response: PermissionGrantedResponse?) {
-                                        super.onPermissionGranted(response)
-                                        cont.resume(Unit)
-                                    }
-
-                                    override fun onPermissionDenied(response: PermissionDeniedResponse?) {
-                                        super.onPermissionDenied(response)
-                                        toast(this@EpisodeListActivity, "Permission denied")
-                                        cont.resumeWithException(Exception("Permission denied"))
-                                    }
-                                })
-                                .check()
-                        }
-                        val linksAndStorages = links.map {
-                            Pair(it, StorageLocator.locate(it))
-                        }.filter {
-                            it.second != null
-                        }.sortedBy {
-                            it.second!!.score()
-                        }
-                        if (linksAndStorages.isEmpty()) {
-                            toast(
-                                this@EpisodeListActivity,
-                                "Can't determine links' storages"
-                            )
-                            return@launch
-                        }
-                        val storage = linksAndStorages.last().second!!
-                        Log.v(TAG, "Using ${storage.name()}")
-                        val storageResult =
-                            withContext(Dispatchers.IO) { storage.extract(linksAndStorages.last().first) }
-                        Log.v(TAG, "storageLink - ${storageResult.link}")
-                        presentLinkToTheUser(episodeName, storageResult)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    } finally {
-                        holder.loading.visibility = View.GONE
-                    }
+                startJob(holder, item, false)
+            }
+            holder.view.setOnLongClickListener {
+                if (holder.loading.visibility != View.GONE || job?.isActive != false) {
+                    return@setOnLongClickListener true
                 }
+                startJob(holder, item, true)
+                true
             }
         }
 

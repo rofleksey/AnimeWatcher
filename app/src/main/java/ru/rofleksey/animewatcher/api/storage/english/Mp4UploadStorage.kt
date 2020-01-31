@@ -1,15 +1,16 @@
-package ru.rofleksey.animewatcher.api.storage
+package ru.rofleksey.animewatcher.api.storage.english
 
 import android.util.Log
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
+import ru.rofleksey.animewatcher.api.model.Quality
 import ru.rofleksey.animewatcher.api.model.StorageAction
 import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.unpackers.PACKERUnpacker
+import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
-import java.io.IOException
 
 class Mp4UploadStorage : Storage {
     companion object {
@@ -21,10 +22,11 @@ class Mp4UploadStorage : Storage {
     }
 
     private object HOLDER {
-        val INSTANCE = Mp4UploadStorage()
+        val INSTANCE =
+            Mp4UploadStorage()
     }
 
-    override suspend fun extract(url: String): StorageResult {
+    override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
         return HttpHandler.instance.executeDirect({
             url.toHttpUrl().newBuilder()
         }, { this }, {
@@ -34,16 +36,17 @@ class Mp4UploadStorage : Storage {
             Log.v(TAG, "scriptTag.data() = $scriptText")
             val unpacked = PACKERUnpacker.unpack(scriptText)
             Log.v(TAG, "unpacked = $unpacked")
-            val match = sourceRegex.find(unpacked) ?: throw IOException("can't match regex!")
-            StorageResult(match.groupValues[1], StorageAction.CUSTOM_ONLY)
+            StorageResult(
+                ApiUtil.getRegex(unpacked,
+                    sourceRegex
+                ),
+                StorageAction.CUSTOM_ONLY
+            )
         })
     }
 
-    override fun score(): Int {
-        return SCORE
-    }
-
-    override fun name(): String {
-        return NAME
-    }
+    override val score: Int
+        get() = SCORE
+    override val name: String
+        get() = NAME
 }

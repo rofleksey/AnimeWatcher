@@ -43,10 +43,16 @@ class TitleStorage private constructor(val prefs: SharedPreferences) {
         prefs.edit().putString("title_storage", json).apply()
     }
 
+    fun hasTitle(name: String, provider: String): Boolean {
+        return entryList.any {
+            it.info.title == name && it.provider == provider
+        }
+    }
+
     @Throws(NoSuchElementException::class)
-    fun findByName(name: String): TitleStorageEntry {
+    fun findByName(name: String, provider: String): TitleStorageEntry {
         return entryList.find {
-            it.info.title == name
+            it.info.title == name && it.provider == provider
         } ?: throw NoSuchElementException("Title doesn't exist")
     }
 

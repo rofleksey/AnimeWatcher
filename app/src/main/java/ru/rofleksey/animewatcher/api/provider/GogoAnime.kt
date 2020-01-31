@@ -107,7 +107,7 @@ class GogoAnime : AnimeProvider {
         prefs: SharedPreferences,
         updateStatus: (title: String) -> Unit
     ) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+
     }
 
     override fun stats(): ProviderStats {

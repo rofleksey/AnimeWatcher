@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.google.gson.Gson
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MultipartBody
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.AnimeProvider
@@ -12,10 +13,12 @@ import ru.rofleksey.animewatcher.api.model.EpisodeInfo
 import ru.rofleksey.animewatcher.api.model.ProviderStats
 import ru.rofleksey.animewatcher.api.model.Quality
 import ru.rofleksey.animewatcher.api.model.TitleInfo
+import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 
 class AnimeDub : AnimeProvider {
+    //TODO: kodik
     companion object {
         private const val TAG = "AnimeDub"
         private const val HOST = "animedub.ru"
@@ -59,8 +62,6 @@ class AnimeDub : AnimeProvider {
                 }
                 map
             }
-
-
             Log.v(TAG, "details - $details")
             val result = mutableListOf<TitleInfo>()
             for (i in 0 until bodies.size) {
@@ -74,9 +75,10 @@ class AnimeDub : AnimeProvider {
                             .host(HOST)
                             .addPathSegments(images[i])
                             .build()
-                            .toString(),
-                        fields = mutableMapOf(links[i] to "link")
-                    )
+                            .toString()
+                    ).also {
+                        it["link"] = links[i]
+                    }
                 )
             }
             result
@@ -84,7 +86,43 @@ class AnimeDub : AnimeProvider {
     }
 
     override suspend fun getEpisodeList(titleInfo: TitleInfo, page: Int): List<EpisodeInfo> {
-        TODO("not implemented")
+        //https://animedub.ru/anime/fehntezi/89-hunter-x-hunter-2-sezon-2011.html
+        //https://animedub.ru/engine/ajax/controller.php?mod=iframeplayer&post_id=89&action=iframe&select=source=2&dubbing=1&series=1&skin=animedub
+        if (page != 0) {
+            return listOf()
+        }
+        val httpUrl = titleInfo["link"].toHttpUrl()
+        val sitePostId = httpUrl.pathSegments.last().split("-").first()
+        titleInfo["sitePostId"] = sitePostId
+        return HttpHandler.instance.executeDirect({
+            HttpUrl.Builder()
+                .scheme("https")
+                .host(HOST)
+                .addPathSegments("engine/ajax/controller.php")
+                .addQueryParameter("mod", "iframeplayer")
+                .addQueryParameter("post_id", sitePostId)
+                .addQueryParameter("action", "selectors")
+                .addQueryParameter("skin", "animedub")
+        }, { this.addHeader("Referer", httpUrl.toString()) }, {
+            val doc = Jsoup.parse(this.actualBody())
+            val options = doc.select("select[name=\"source\"] option")
+            titleInfo["providerArray"] = options.joinToString(",") {
+                it.attr("value")
+            }
+            Log.v(TAG, "Providers: ${titleInfo["providerArray"]}")
+            val dubbings = doc.select("select[name=\"dubbing\"] option")
+            titleInfo["dubbingArray"] = dubbings.joinToString(",") {
+                it.attr("value")
+            }
+            Log.v(TAG, "Dubbings: ${titleInfo["dubbingArray"]}")
+            val episodes = doc.select("select[name=\"series\"] option")
+            episodes.map {
+                EpisodeInfo(
+                    it.attr("value"),
+                    null
+                )
+            }
+        })
     }
 
     override suspend fun getStorageLinks(
@@ -92,7 +130,25 @@ class AnimeDub : AnimeProvider {
         episodeInfo: EpisodeInfo,
         prefQuality: Quality
     ): List<String> {
-        TODO("not implemented")
+        val httpUrl = titleInfo["link"].toHttpUrl()
+        val providerIds = titleInfo["providerArray"].split(",")
+        val dubbingIds = titleInfo["providerArray"].split(",")
+        return providerIds.map { providerId ->
+            HttpHandler.instance.executeDirect({
+                HttpUrl.Builder()
+                    .scheme("https")
+                    .host(HOST)
+                    .addPathSegments("engine/ajax/controller.php")
+                    .addQueryParameter("mod", "iframeplayer")
+                    .addQueryParameter("post_id", titleInfo["sitePostId"])
+                    .addQueryParameter("action", "iframe")
+                    .addQueryParameter("select",
+                        "source=$providerId&dubbing=${dubbingIds.first()}&series=${episodeInfo.name}")
+                    .addQueryParameter("skin", "animedub")
+            }, { this.addHeader("Referer", httpUrl.toString()) }, {
+                ApiUtil.sanitizeScheme(this.actualBody()).also { Log.v(TAG, "storageLink = $it") }
+            })
+        }
     }
 
     override suspend fun init(
@@ -100,14 +156,19 @@ class AnimeDub : AnimeProvider {
         prefs: SharedPreferences,
         updateStatus: (title: String) -> Unit
     ) {
-        TODO("not implemented")
+
     }
 
     override fun stats(): ProviderStats {
-        TODO("not implemented")
+        return ProviderStats(
+            needsContext = false,
+            hasCloudfare = false,
+            episodesDesc = false,
+            episodesPerPage = 99999
+        )
     }
 
     override fun clearCache() {
-        TODO("not implemented")
+
     }
 }

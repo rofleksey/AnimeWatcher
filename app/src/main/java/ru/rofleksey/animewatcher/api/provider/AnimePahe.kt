@@ -71,14 +71,8 @@ class AnimePahe : AnimeProvider {
             val ep = data.getAsJsonObject(episodeInfo["id"])
             val links = mutableListOf<Pair<Quality, String>>()
             for (prop in ep.entrySet()) {
-                val key = when (prop.key) {
-                    "360p" -> Quality.q360
-                    "480p" -> Quality.q480
-                    "720p" -> Quality.q720
-                    "1080p" -> Quality.q1080
-                    else -> Quality.UNKNOWN
-                }
-                links.add(Pair(key, prop.value.asJsonObject.get("url").asString))
+                val quality = ApiUtil.strToQuality(prop.key)
+                links.add(Pair(quality, prop.value.asJsonObject.get("url").asString))
             }
             listOf(ApiUtil.pickQuality(links, prefQuality))
         })
@@ -90,14 +84,14 @@ class AnimePahe : AnimeProvider {
         updateStatus: (title: String) -> Unit
     ) {
         updateStatus("Initializing AnimePahe...")
-        bypassCloudfare(
+        bypassCloudflare(
             context, HttpUrl.Builder()
                 .scheme("https")
                 .host(HOST)
                 .build()
         )
         updateStatus("Initializing AnimePahe images...")
-        bypassCloudfare(
+        bypassCloudflare(
             context, HttpUrl.Builder()
                 .scheme("https")
                 .host("i.$HOST")

@@ -3,9 +3,10 @@ package ru.rofleksey.animewatcher.api.model
 class TitleInfo(
     val title: String,
     val details: String,
-    val image: String?,
-    val fields: MutableMap<String, String> = HashMap()
+    val image: String?
 ) : Comparable<TitleInfo> {
+    val fields: MutableMap<String, String> = HashMap()
+
     override fun compareTo(other: TitleInfo): Int {
         return title.compareTo(other.title)
     }
