@@ -120,7 +120,7 @@ class SearchActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 searchDebounces.stop()
                 job?.cancel()
-                if (s == null || s.length <= 2) {
+                if (s == null || s.isEmpty()) {
                     titleData.clear()
                     adapter.notifyDataSetChanged()
                     return

@@ -2,6 +2,7 @@ package ru.rofleksey.animewatcher.api.storage.english
 
 import android.util.Log
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MultipartBody
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
@@ -20,7 +21,8 @@ class KwikStorage private constructor() : Storage {
         const val NAME = "kwik"
         const val SCORE = 50
         val instance: KwikStorage by lazy { HOLDER.INSTANCE }
-        private val downloadRegex = Regex("download:'([^']+)'")
+//        private val downloadRegex = Regex("download:'([^']+)'")
+        private val urlRegex = Regex("/./")
     }
 
     private object HOLDER {
@@ -35,23 +37,24 @@ class KwikStorage private constructor() : Storage {
     override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
         val uri = URI(url)
         // E
-        val downloadKwikSite = HttpHandler.instance.executeDirect({
-            this.scheme(uri.scheme).host(uri.host).addPathSegments(uri.path)
-        }, { this.addHeader("Referer", url) }, {
-            val doc = Jsoup.parse(this.actualBody())
-            val script = doc.selectFirst("body > script:nth-child(6)")
-            val scriptText = script.data()
-            val unpacked = PACKERUnpacker.unpack(scriptText)
-            Log.v(TAG, unpacked)
-            ApiUtil.getRegex(unpacked,
-                downloadRegex
-            )
-        })
+//        val downloadKwikSite = HttpHandler.instance.executeDirect({
+//            this.scheme(uri.scheme).host(uri.host).addPathSegments(uri.path)
+//        }, { this.addHeader("Referer", url) }, {
+//            val doc = Jsoup.parse(this.actualBody())
+//            val script = doc.selectFirst("body > script:nth-child(6)")
+//            val scriptText = script.data()
+//            val unpacked = PACKERUnpacker.unpack(scriptText)
+//            Log.v(TAG, unpacked)
+//            ApiUtil.getRegex(unpacked,
+//                downloadRegex
+//            )
+//        })
         // F
+        val downloadKwikSite = url.replace(urlRegex, "/f/")
         Log.v(TAG, "downloadKwikSite - $downloadKwikSite")
         val (link, token) = HttpHandler.instance.executeDirect({
-            this.scheme(uri.scheme).host(uri.host).addPathSegments(downloadKwikSite)
-        }, { this.addHeader("Referer", url) }, {
+            downloadKwikSite.toHttpUrl().newBuilder()
+        }, { this.addHeader("Referer", downloadKwikSite) }, {
             val doc = Jsoup.parse(this.actualBody())
             val form =
                 doc.selectFirst("#app > main > div > div > div.columns.is-multiline > div:nth-child(2) > div:nth-child(2) > form")
