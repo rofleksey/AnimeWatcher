@@ -23,18 +23,18 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.afollestad.materialdialogs.MaterialDialog
 import com.afollestad.materialdialogs.list.listItems
+import com.airbnb.lottie.LottieAnimationView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.github.ybq.android.spinkit.SpinKitView
-import com.jakewharton.processphoenix.ProcessPhoenix
 import com.mikepenz.iconics.view.IconicsImageButton
 import jp.wasabeef.recyclerview.animators.FadeInAnimator
 import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.TitleInfo
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
-import ru.rofleksey.animewatcher.storage.TitleStorage
-import ru.rofleksey.animewatcher.storage.TitleStorageEntry
+import ru.rofleksey.animewatcher.database.TitleStorage
+import ru.rofleksey.animewatcher.database.TitleStorageEntry
 import ru.rofleksey.animewatcher.util.Debounce
 import ru.rofleksey.animewatcher.util.Util.Companion.toast
 import kotlin.system.measureTimeMillis
@@ -59,6 +59,8 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var searchView: EditText
     private lateinit var buttonBack: IconicsImageButton
     private lateinit var buttonProviders: IconicsImageButton
+    private lateinit var emptyBackground: LottieAnimationView
+    private lateinit var emptyText: TextView
 
     private lateinit var titleStorage: TitleStorage
     private lateinit var provider: AnimeProvider
@@ -83,7 +85,7 @@ class SearchActivity : AppCompatActivity() {
 
         providerName = sharedPreferences.getString("provider", ProviderFactory.DEFAULT)
             ?: ProviderFactory.ANIMEPAHE
-        provider = ProviderFactory.get(providerName)
+        provider = ProviderFactory.get(this, providerName)
 
         val barViewGroup = LayoutInflater.from(this).inflate(
             R.layout.action_bar_search,
@@ -123,6 +125,7 @@ class SearchActivity : AppCompatActivity() {
                 if (s == null || s.isEmpty()) {
                     titleData.clear()
                     adapter.notifyDataSetChanged()
+                    toggleBackground(true)
                     return
                 }
                 searchDebounces.attempt(Runnable {
@@ -140,19 +143,17 @@ class SearchActivity : AppCompatActivity() {
                     when (index) {
                         0 -> {
                             providerName = ProviderFactory.ANIMEPAHE
-                            sharedPreferences.edit().putString("provider", providerName).commit()
-                            toast(this@SearchActivity, "Switching to AnimePahe")
-                            ProcessPhoenix.triggerRebirth(this@SearchActivity)
-                            return@listItems
+                            provider = ProviderFactory.get(this@SearchActivity, providerName)
+                            toast(this@SearchActivity, "Using AnimePahe")
                         }
                         1 -> {
                             providerName = ProviderFactory.ANIMEDUB
-                            provider = ProviderFactory.get(providerName)
+                            provider = ProviderFactory.get(this@SearchActivity, providerName)
                             toast(this@SearchActivity, "Using AnimeDub")
                         }
                         2 -> {
                             providerName = ProviderFactory.GOGOANIME
-                            provider = ProviderFactory.get(providerName)
+                            provider = ProviderFactory.get(this@SearchActivity, providerName)
                             toast(this@SearchActivity, "Using GogoAnime")
                         }
                         else -> {
@@ -173,6 +174,8 @@ class SearchActivity : AppCompatActivity() {
             }
         }
 
+        emptyBackground = findViewById(R.id.empty_background)
+        emptyText = findViewById(R.id.empty_text)
         loadingView = findViewById(R.id.loading)
 
         recyclerView = findViewById(R.id.recycler_view)
@@ -198,6 +201,17 @@ class SearchActivity : AppCompatActivity() {
         recyclerView.layoutManager = layoutManager
         adapter = TitleAdapter(titleData)
         recyclerView.adapter = adapter
+        toggleBackground(true)
+    }
+
+    private fun toggleBackground(on: Boolean) {
+        if (on && titleData.isEmpty()) {
+            emptyBackground.visibility = View.VISIBLE
+            emptyText.visibility = View.VISIBLE
+        } else {
+            emptyBackground.visibility = View.GONE
+            emptyText.visibility = View.GONE
+        }
     }
 
     override fun onDestroy() {
@@ -209,6 +223,7 @@ class SearchActivity : AppCompatActivity() {
     fun runSearch(s: String): Job {
         return coroutineScope.launch {
             try {
+                toggleBackground(false)
                 loadingView.visibility = View.VISIBLE
                 val results = withContext(Dispatchers.IO) {
                     provider.search(s)
@@ -245,6 +260,7 @@ class SearchActivity : AppCompatActivity() {
                 e.printStackTrace()
             } finally {
                 loadingView.visibility = View.INVISIBLE
+                toggleBackground(true)
             }
         }
     }

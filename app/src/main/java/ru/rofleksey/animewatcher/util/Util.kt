@@ -1,9 +1,18 @@
 package ru.rofleksey.animewatcher.util
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.view.ViewGroup
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.net.toUri
+import ru.rofleksey.animewatcher.R
+import ru.rofleksey.animewatcher.api.model.Quality
+import java.io.File
+
 
 class Util {
     companion object {
@@ -18,12 +27,51 @@ class Util {
             context.startActivity(vlc)
         }
 
+        fun openInChrome(context: Context, url: String) {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW)
+                intent.setPackage("com.android.chrome")
+                intent.data = Uri.parse(url)
+                context.startActivity(intent)
+            } catch (e: ActivityNotFoundException) {
+                openDefault(context, url)
+            }
+        }
+
+        fun openDefault(context: Context, url: String) {
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.setDataAndType(Uri.parse(url), "video/*")
+            context.startActivity(intent)
+        }
+
+        fun openDefaultFile(context: Context, url: String) {
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.setDataAndType(Uri.fromFile(File(url)), "video/*")
+            context.startActivity(intent)
+        }
+
         fun toast(context: Context, str: String) {
             Toast.makeText(context, str, Toast.LENGTH_LONG).show()
         }
 
         fun sanitizeForFileName(s: String): String {
             return s.replace(FILENAME_REGEX, "_")
+        }
+
+        fun spotlightLayout(activity: Activity, text: String): ViewGroup {
+            val layout = activity.layoutInflater.inflate(R.layout.spotlight_layout, null)
+            val textView: TextView = layout.findViewById(R.id.spotlight_text)
+            textView.text = text
+            return layout as ViewGroup
+        }
+
+        fun qualityToStr(quality: Quality): String {
+            val number = quality.num
+            return if (number == 0) {
+                "???p"
+            } else {
+                "${number}p"
+            }
         }
     }
 }

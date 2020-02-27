@@ -3,6 +3,7 @@ package ru.rofleksey.animewatcher.api.model
 class TitleInfo(
     val title: String,
     val details: String,
+    var airStatus: TitleAirStatus,
     val image: String?
 ) : Comparable<TitleInfo> {
     val fields: MutableMap<String, String> = HashMap()

@@ -70,6 +70,10 @@ dependencies {
     implementation "com.mikepenz:materialdrawer:7.0.0"
     implementation "androidx.annotation:annotation:1.1.0"
     implementation "com.mikepenz:materialdrawer-nav:7.0.0"
+    implementation 'com.airbnb.android:lottie:3.4.0'
+    implementation 'com.daimajia.easing:library:2.0@aar'
+    implementation 'com.daimajia.androidanimations:library:2.3@aar'
+    implementation 'com.github.takusemba:spotlight:2.0.1'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.6.0'
     //testImplementation 'org.mockito:mockito-core:3.2.4'

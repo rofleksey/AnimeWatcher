@@ -1,14 +1,10 @@
 package ru.rofleksey.animewatcher
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
-import android.content.Context
-import android.content.Intent
-import android.content.SharedPreferences
+import android.content.*
 import android.graphics.Rect
 import android.os.Bundle
-import android.os.Environment
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -17,7 +13,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.net.toUri
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -30,29 +26,18 @@ import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions.bitmapTransform
 import com.github.ybq.android.spinkit.SpinKitView
 import com.google.android.material.snackbar.Snackbar
-import com.karumi.dexter.Dexter
-import com.karumi.dexter.listener.PermissionDeniedResponse
-import com.karumi.dexter.listener.PermissionGrantedResponse
-import com.karumi.dexter.listener.single.BasePermissionListener
 import jp.wasabeef.glide.transformations.BlurTransformation
 import jp.wasabeef.glide.transformations.gpu.PixelationFilterTransformation
 import jp.wasabeef.recyclerview.animators.LandingAnimator
 import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
-import ru.rofleksey.animewatcher.api.model.Quality
-import ru.rofleksey.animewatcher.api.model.StorageAction
-import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
-import ru.rofleksey.animewatcher.api.storage.StorageLocator
-import ru.rofleksey.animewatcher.storage.TitleStorage
-import ru.rofleksey.animewatcher.storage.TitleStorageEntry
-import ru.rofleksey.animewatcher.util.Util.Companion.openInVlc
-import ru.rofleksey.animewatcher.util.Util.Companion.sanitizeForFileName
-import ru.rofleksey.animewatcher.util.Util.Companion.toast
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
+import ru.rofleksey.animewatcher.database.EpisodeDownloadState
+import ru.rofleksey.animewatcher.database.TitleStorage
+import ru.rofleksey.animewatcher.database.TitleStorageEntry
+import ru.rofleksey.animewatcher.util.Util
+import java.io.File
 
 class EpisodeListActivity : AppCompatActivity() {
     companion object {
@@ -78,6 +63,10 @@ class EpisodeListActivity : AppCompatActivity() {
     private lateinit var provider: AnimeProvider
     private lateinit var providerName: String
     private lateinit var titleStorage: TitleStorage
+    private lateinit var argTitleName: String
+    private lateinit var argTitleProvider: String
+
+    private lateinit var downloadBroadcastReceiver: BroadcastReceiver
 
     private var lastEpisodeNumber: Int = -1
     private var snackbar: Snackbar? = null
@@ -93,16 +82,16 @@ class EpisodeListActivity : AppCompatActivity() {
         sharedPreferences = getSharedPreferences("animewatcher", Context.MODE_PRIVATE)
         titleStorage = TitleStorage.load(sharedPreferences)
 
-        val titleName = intent.getStringExtra(ARG_TITLE) ?: ""
-        val titleProvider = intent.getStringExtra(ARG_PROVIDER) ?: ""
-        titleEntry = titleStorage.findByName(titleName, titleProvider)
+        argTitleName = intent.getStringExtra(ARG_TITLE) ?: ""
+        argTitleProvider = intent.getStringExtra(ARG_PROVIDER) ?: ""
+        titleEntry = titleStorage.findByName(argTitleName, argTitleProvider)
         providerName = titleEntry.provider
-        provider = ProviderFactory.get(providerName)
+        provider = ProviderFactory.get(this, providerName)
 
         downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         val barViewGroup = LayoutInflater.from(this).inflate(
-            R.layout.action_bar_episode_list,
+            R.layout.action_bar_empty,
             null, false
         ) as ViewGroup
         supportActionBar?.setDisplayShowTitleEnabled(false)
@@ -122,34 +111,38 @@ class EpisodeListActivity : AppCompatActivity() {
             }
             job?.cancel()
             job = coroutineScope.launch {
-                val result = withContext(Dispatchers.Default) {
-                    DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-                        override fun areItemsTheSame(
-                            oldPos: Int,
-                            newPos: Int
-                        ): Boolean = episodeData[oldPos].name == refreshData!![newPos].name
+                try {
+                    val result = withContext(Dispatchers.Default) {
+                        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                            override fun areItemsTheSame(
+                                oldPos: Int,
+                                newPos: Int
+                            ): Boolean = episodeData[oldPos].name == refreshData!![newPos].name
 
-                        override fun getOldListSize(): Int = episodeData.size
+                            override fun getOldListSize(): Int = episodeData.size
 
-                        override fun getNewListSize(): Int = refreshData!!.size
+                            override fun getNewListSize(): Int = refreshData!!.size
 
-                        override fun areContentsTheSame(
-                            oldPos: Int,
-                            newPos: Int
-                        ): Boolean = episodeData[oldPos] == refreshData!![newPos]
+                            override fun areContentsTheSame(
+                                oldPos: Int,
+                                newPos: Int
+                            ): Boolean = episodeData[oldPos] == refreshData!![newPos]
 
-                    })
+                        })
+                    }
+                    episodeData.clear()
+                    episodeData.addAll(refreshData!!)
+                    titleEntry.cachedEpisodeList.clear()
+                    titleEntry.cachedEpisodeList.addAll(refreshData!!)
+                    titleStorage.save()
+                    refreshData = null
+                    result.dispatchUpdatesTo(adapter)
+                    snackbar?.dismiss()
+                    refreshLayout.isRefreshing = false
+                    refreshLayout.isEnabled = false
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                episodeData.clear()
-                episodeData.addAll(refreshData!!)
-                titleEntry.cachedEpisodeList.clear()
-                titleEntry.cachedEpisodeList.addAll(refreshData!!)
-                titleStorage.save()
-                refreshData = null
-                result.dispatchUpdatesTo(adapter)
-                snackbar?.dismiss()
-                refreshLayout.isRefreshing = false
-                refreshLayout.isEnabled = false
             }
         }
         refreshLayout.isEnabled = false
@@ -203,6 +196,8 @@ class EpisodeListActivity : AppCompatActivity() {
                     titleEntry.cachedEpisodeList
                 }
                 Log.v(TAG, "titleEntry.lastEpisodeNumber = ${titleEntry.lastEpisodeNumber}")
+                episodeData.clear()
+                adapter.notifyDataSetChanged()
                 episodeData.addAll(episodes)
                 if (firstTime) {
                     titleEntry.cachedEpisodeList.addAll(episodes)
@@ -216,7 +211,6 @@ class EpisodeListActivity : AppCompatActivity() {
                 }
                 adapter.notifyItemRangeInserted(0, episodeData.size)
                 if (!firstTime) {
-                    provider.clearCache()
                     val newEpisodes = withContext(Dispatchers.IO) {
                         provider.getAllEpisodes(titleEntry.info)
                     }
@@ -240,6 +234,7 @@ class EpisodeListActivity : AppCompatActivity() {
                 } else {
                     snackbar?.dismiss()
                 }
+                updateDownloadState()
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -248,51 +243,40 @@ class EpisodeListActivity : AppCompatActivity() {
         }
     }
 
-    private fun download(episodeName: String, result: StorageResult) {
-        val downloadTitle = "${titleEntry.info.title}_${episodeName}.mp4"
-        val fileName = sanitizeForFileName(downloadTitle)
-        val downloadRequest = DownloadManager.Request(result.link.toUri())
-        val description = "Downloading episode #$episodeName of ${titleEntry.info.title}"
-        for (entry in result.headers.entries) {
-            downloadRequest.addRequestHeader(entry.key, entry.value)
-            Log.v(TAG, "Setting header ${entry.key}=${entry.value}")
-        }
-        downloadRequest.setTitle(downloadTitle)
-        downloadRequest.setDescription(description)
-        downloadRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        downloadRequest.setVisibleInDownloadsUi(true)
-        downloadRequest.setDestinationInExternalPublicDir(
-            Environment.DIRECTORY_DOWNLOADS,
-            fileName
-        )
-        val taskId = downloadManager.enqueue(downloadRequest)
-        toast(this, description)
-    }
-
-    private fun openDefault(link: String) {
-        val browserIntent = Intent(Intent.ACTION_VIEW, link.toUri())
-        startActivity(browserIntent)
-    }
-
-    private fun presentLinkToTheUser(episodeName: String, result: StorageResult) {
-        when (result.action) {
-            StorageAction.DOWNLOAD_ONLY -> download(episodeName, result)
-            StorageAction.CUSTOM_ONLY -> openDefault(result.link)
-            else -> MaterialDialog(this).show {
-                title(text = "Action")
-                message(text = "What do you want to do with #$episodeName ?")
-                positiveButton(text = "download") {
-                    download(episodeName, result)
+    private fun updateDownloadState(): Boolean {
+        Log.v(TAG, "updateDownloadState()")
+        var changedResult = false
+        titleEntry.downloads.entries.forEach { entry ->
+            var changed = false;
+            val query = DownloadManager.Query()
+            query.setFilterById(entry.value.id)
+            val result = downloadManager.query(query)
+            if (result.moveToFirst()) {
+                val status = result.getInt(result.getColumnIndex(DownloadManager.COLUMN_STATUS))
+                when {
+                    status == DownloadManager.STATUS_FAILED && entry.value.state != EpisodeDownloadState.REJECTED -> {
+                        entry.value.state = EpisodeDownloadState.REJECTED
+                        changedResult = true
+                        changed = true
+                    }
+                    status == DownloadManager.STATUS_SUCCESSFUL && entry.value.state != EpisodeDownloadState.FINISHED -> {
+                        entry.value.state = EpisodeDownloadState.FINISHED
+                        changedResult = true
+                        changed = true
+                    }
                 }
-                neutralButton(text = "open in VLC") {
-                    openInVlc(this@EpisodeListActivity, result.link)
-                }
-                negativeButton(text = "custom") {
-                    openDefault(result.link)
-                }
+            } else if (entry.value.state != EpisodeDownloadState.REJECTED) {
+                entry.value.state = EpisodeDownloadState.REJECTED
+                changedResult = true
+                changed = true
+            }
+            if (changed) {
+                val index = episodeData.indexOfFirst { it.name == entry.key }
+                Log.v(TAG, "Updating download state of episode #${entry.key}")
+                adapter.notifyItemChanged(index)
             }
         }
-
+        return changedResult
     }
 
     override fun onDestroy() {
@@ -300,73 +284,35 @@ class EpisodeListActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private suspend fun process(episodeInfo: EpisodeInfo, askStorage: Boolean) {
-        val links = withContext(Dispatchers.IO) {
-            provider.getStorageLinks(
-                titleEntry.info,
-                episodeInfo,
-                Quality.q720
-            )
+    override fun onResume() {
+        super.onResume()
+        titleStorage = TitleStorage.load(sharedPreferences)
+        titleEntry = titleStorage.findByName(argTitleName, argTitleProvider)
+        episodeData.clear()
+        episodeData.addAll(titleEntry.cachedEpisodeList)
+        if (updateDownloadState()) {
+            titleStorage.save()
         }
-        if (links.isEmpty()) {
-            throw Exception("No links retreived from $provider")
-        }
-        suspendCoroutine<Unit> { cont ->
-            Dexter.withActivity(this@EpisodeListActivity)
-                .withPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                .withListener(object : BasePermissionListener() {
-                    override fun onPermissionGranted(response: PermissionGrantedResponse?) {
-                        super.onPermissionGranted(response)
-                        cont.resume(Unit)
-                    }
-
-                    override fun onPermissionDenied(response: PermissionDeniedResponse?) {
-                        super.onPermissionDenied(response)
-                        toast(this@EpisodeListActivity, "Permission denied")
-                        cont.resumeWithException(Exception("Permission denied"))
-                    }
-                })
-                .check()
-        }
-        val linksAndStorages = links.map {
-            Pair(it, StorageLocator.locate(it))
-        }.filter {
-            it.second != null
-        }.sortedBy {
-            -it.second!!.score
-        }
-        if (linksAndStorages.isEmpty()) {
-            throw Exception("Failed to determine download method")
-        }
-        val index = if (!askStorage) {
-            0
-        } else {
-            val displayList = linksAndStorages.map { it.second!!.name }
-            var resumed = false
-            val index = suspendCoroutine<Int> { cont ->
-                MaterialDialog(this).show {
-                    listItems(items = displayList) { dialog, index, text ->
-                        resumed = true
-                        cont.resume(index)
-                        dialog.dismiss()
-                    }
-                    onDismiss {
-                        if (!resumed) {
-                            cont.resumeWithException(Exception("Dialog closed"))
-                        }
-                    }
+        adapter.notifyDataSetChanged()
+        downloadBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                Log.v(TAG, "Received broadcast event from DownloadManager")
+                if (updateDownloadState()) {
+                    titleStorage.save()
                 }
             }
-            index
         }
-        val storage = linksAndStorages[index].second!!
-        val finalLink = linksAndStorages[index].first
-        Log.v(TAG, "Using ${storage.name}: $finalLink")
-        val storageResult = withContext(Dispatchers.IO) {
-            storage.extract(finalLink, Quality.q720)
-        }
-        Log.v(TAG, "storageLink - ${storageResult.link}")
-        presentLinkToTheUser(episodeInfo.name, storageResult)
+        val filter = IntentFilter()
+        filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        registerReceiver(
+            downloadBroadcastReceiver,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        )
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterReceiver(downloadBroadcastReceiver)
     }
 
     private class EpisodeViewHolder(
@@ -397,20 +343,6 @@ class EpisodeListActivity : AppCompatActivity() {
             )
         }
 
-        private fun startJob(holder: EpisodeViewHolder, info: EpisodeInfo, askStorage: Boolean) {
-            job = coroutineScope.launch {
-                try {
-                    holder.loading.visibility = View.VISIBLE
-                    process(info, askStorage)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    Snackbar.make(refreshLayout, e.message ?: "Error", Snackbar.LENGTH_SHORT).show()
-                } finally {
-                    holder.loading.visibility = View.GONE
-                }
-            }
-        }
-
         override fun onBindViewHolder(holder: EpisodeViewHolder, pos: Int) {
             val item = data[pos]
             Glide
@@ -426,17 +358,80 @@ class EpisodeListActivity : AppCompatActivity() {
                 .transition(DrawableTransitionOptions.withCrossFade(CROSSFADE_DURATION))
                 .into(holder.image)
             holder.text.text = item.name
+            if (titleEntry.downloads[item.name]?.state == EpisodeDownloadState.PENDING) {
+                holder.loading.visibility = View.VISIBLE
+            } else {
+                holder.loading.visibility = View.GONE
+            }
+            holder.text.setBackgroundColor(
+                ContextCompat.getColor(
+                    this@EpisodeListActivity, when (titleEntry.downloads[item.name]?.state) {
+                        null -> R.color.colorWhite
+                        EpisodeDownloadState.REJECTED -> R.color.accent
+                        EpisodeDownloadState.FINISHED -> R.color.primary
+                        EpisodeDownloadState.PENDING -> R.color.colorHighlight
+                    }
+                )
+            )
             holder.view.setOnClickListener {
-                if (holder.loading.visibility != View.GONE || job?.isActive != false) {
-                    return@setOnClickListener
+                when (titleEntry.downloads[item.name]?.state) {
+                    null, EpisodeDownloadState.REJECTED -> {
+                        val downloadIntent =
+                            Intent(this@EpisodeListActivity, DownloadActivity::class.java)
+                        downloadIntent.putExtra(DownloadActivity.ARG_TITLE, titleEntry.info.title)
+                        downloadIntent.putExtra(DownloadActivity.ARG_PROVIDER, titleEntry.provider)
+                        downloadIntent.putExtra(DownloadActivity.ARG_EPISODE_NAME, item.name)
+                        startActivity(downloadIntent)
+                    }
+                    EpisodeDownloadState.PENDING -> {
+                        Util.toast(this@EpisodeListActivity, "Already downloading!")
+                    }
+                    EpisodeDownloadState.FINISHED -> {
+                        val downloadEntry = titleEntry.downloads[item.name]!!
+                        if (downloadEntry.file == null || !File(downloadEntry.file).exists()) {
+                            Util.toast(
+                                this@EpisodeListActivity,
+                                "File ${downloadEntry.file} doesn't exist!"
+                            )
+                            return@setOnClickListener
+                        }
+                        Util.openInVlc(this@EpisodeListActivity, downloadEntry.file)
+                    }
                 }
-                startJob(holder, item, false)
             }
             holder.view.setOnLongClickListener {
-                if (holder.loading.visibility != View.GONE || job?.isActive != false) {
-                    return@setOnLongClickListener true
+                val downloadEntry =
+                    titleEntry.downloads[item.name] ?: return@setOnLongClickListener false
+                val items = listOf("Open", "Delete")
+                MaterialDialog(this@EpisodeListActivity).show {
+                    listItems(items = items) { dialog, index, text ->
+                        if (text == "Open") {
+                            if (downloadEntry.file == null || !File(downloadEntry.file).exists()) {
+                                Util.toast(
+                                    this@EpisodeListActivity,
+                                    "File ${downloadEntry.file} doesn't exist!"
+                                )
+                                return@listItems
+                            }
+                            Util.openDefaultFile(this@EpisodeListActivity, downloadEntry.file)
+                        } else if (text == "Delete") {
+                            MaterialDialog(this@EpisodeListActivity).show {
+                                title(text = "Delete file")
+                                message(text = "Remove download file of episode #'${item.name}?'")
+                                positiveButton(text = "Yes") {
+                                    File(downloadEntry.file!!).delete()
+                                    titleEntry.downloads.remove(item.name)
+                                    adapter.notifyItemChanged(holder.adapterPosition)
+                                    titleStorage.save()
+                                }
+                                negativeButton(text = "No")
+                            }
+                        }
+                    }
+                    onDismiss {
+
+                    }
                 }
-                startJob(holder, item, true)
                 true
             }
         }

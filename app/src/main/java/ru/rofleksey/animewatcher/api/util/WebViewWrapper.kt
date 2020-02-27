@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import android.webkit.CookieManager
-import android.webkit.ValueCallback
 import android.webkit.WebView
 import okhttp3.Cookie
 import ru.rofleksey.animewatcher.util.Util
@@ -16,9 +15,9 @@ class WebViewWrapper private constructor(val webView: WebView) {
         fun with(context: Context): WebViewWrapper {
             val webView = WebView(context)
             webView.setWillNotDraw(true)
-            CookieManager.getInstance().removeAllCookies(ValueCallback {
-
-            })
+//            CookieManager.getInstance().removeAllCookies(ValueCallback {
+//
+//            })
             webView.clearCache(false)
             with(webView.settings) {
                 javaScriptEnabled = true

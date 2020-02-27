@@ -4,8 +4,7 @@ import android.util.Log
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
-import ru.rofleksey.animewatcher.api.model.Quality
-import ru.rofleksey.animewatcher.api.model.StorageAction
+import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.unpackers.PACKERUnpacker
 import ru.rofleksey.animewatcher.api.util.ApiUtil
@@ -26,9 +25,9 @@ class Mp4UploadStorage : Storage {
             Mp4UploadStorage()
     }
 
-    override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
+    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
         return HttpHandler.instance.executeDirect({
-            url.toHttpUrl().newBuilder()
+            providerResult.link.toHttpUrl().newBuilder()
         }, { this }, {
             val doc = Jsoup.parse(this.actualBody())
             val scriptTag = doc.selectFirst("body > script:nth-child(10)")
@@ -36,11 +35,13 @@ class Mp4UploadStorage : Storage {
             Log.v(TAG, "scriptTag.data() = $scriptText")
             val unpacked = PACKERUnpacker.unpack(scriptText)
             Log.v(TAG, "unpacked = $unpacked")
-            StorageResult(
+            listOf(
+                StorageResult(
                 ApiUtil.getRegex(unpacked,
                     sourceRegex
                 ),
-                StorageAction.CUSTOM_ONLY
+                    providerResult.quality
+                )
             )
         })
     }

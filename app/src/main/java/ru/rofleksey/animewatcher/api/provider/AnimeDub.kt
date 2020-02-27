@@ -1,7 +1,6 @@
 package ru.rofleksey.animewatcher.api.provider
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import com.google.gson.Gson
 import okhttp3.HttpUrl
@@ -9,15 +8,12 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MultipartBody
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.AnimeProvider
-import ru.rofleksey.animewatcher.api.model.EpisodeInfo
-import ru.rofleksey.animewatcher.api.model.ProviderStats
-import ru.rofleksey.animewatcher.api.model.Quality
-import ru.rofleksey.animewatcher.api.model.TitleInfo
+import ru.rofleksey.animewatcher.api.model.*
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 
-class AnimeDub : AnimeProvider {
+class AnimeDub(context: Context) : AnimeProvider(context) {
     //TODO: kodik
     companion object {
         private const val TAG = "AnimeDub"
@@ -70,6 +66,7 @@ class AnimeDub : AnimeProvider {
                         title = titles[i],
                         details = details[i]["Количество серий:"] ?: details[i]["Год выхода:"]
                         ?: "",
+                        airStatus = TitleAirStatus.UNKNOWN,
                         image = HttpUrl.Builder()
                             .scheme("https")
                             .host(HOST)
@@ -83,6 +80,10 @@ class AnimeDub : AnimeProvider {
             }
             result
         })
+    }
+
+    override suspend fun updateTitleMeta(titleInfo: TitleInfo) {
+        // no metadata to update
     }
 
     override suspend fun getEpisodeList(titleInfo: TitleInfo, page: Int): List<EpisodeInfo> {
@@ -127,9 +128,8 @@ class AnimeDub : AnimeProvider {
 
     override suspend fun getStorageLinks(
         titleInfo: TitleInfo,
-        episodeInfo: EpisodeInfo,
-        prefQuality: Quality
-    ): List<String> {
+        episodeInfo: EpisodeInfo
+    ): List<ProviderResult> {
         val httpUrl = titleInfo["link"].toHttpUrl()
         val providerIds = titleInfo["providerArray"].split(",")
         val dubbingIds = titleInfo["providerArray"].split(",")
@@ -146,17 +146,17 @@ class AnimeDub : AnimeProvider {
                         "source=$providerId&dubbing=${dubbingIds.first()}&series=${episodeInfo.name}")
                     .addQueryParameter("skin", "animedub")
             }, { this.addHeader("Referer", httpUrl.toString()) }, {
-                ApiUtil.sanitizeScheme(this.actualBody()).also { Log.v(TAG, "storageLink = $it") }
+                ProviderResult(
+                    ApiUtil.sanitizeScheme(this.actualBody()).also {
+                        Log.v(
+                            TAG,
+                            "storageLink = $it"
+                        )
+                    },
+                    Quality.UNKNOWN
+                )
             })
         }
-    }
-
-    override suspend fun init(
-        context: Context,
-        prefs: SharedPreferences,
-        updateStatus: (title: String) -> Unit
-    ) {
-
     }
 
     override fun stats(): ProviderStats {
@@ -166,9 +166,5 @@ class AnimeDub : AnimeProvider {
             episodesDesc = false,
             episodesPerPage = 99999
         )
-    }
-
-    override fun clearCache() {
-
     }
 }

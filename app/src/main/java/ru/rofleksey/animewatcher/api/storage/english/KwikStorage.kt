@@ -6,11 +6,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MultipartBody
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
-import ru.rofleksey.animewatcher.api.model.Quality
-import ru.rofleksey.animewatcher.api.model.StorageAction
+import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
-import ru.rofleksey.animewatcher.api.unpackers.PACKERUnpacker
-import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 import java.net.URI
@@ -26,16 +23,15 @@ class KwikStorage private constructor() : Storage {
     }
 
     private object HOLDER {
-        val INSTANCE =
-            KwikStorage()
+        val INSTANCE = KwikStorage()
     }
 
 
 
     private data class DownloadExtraction(val link: String, val token: String)
 
-    override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
-        val uri = URI(url)
+    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
+        val uri = URI(providerResult.link)
         // E
 //        val downloadKwikSite = HttpHandler.instance.executeDirect({
 //            this.scheme(uri.scheme).host(uri.host).addPathSegments(uri.path)
@@ -50,7 +46,7 @@ class KwikStorage private constructor() : Storage {
 //            )
 //        })
         // F
-        val downloadKwikSite = url.replace(urlRegex, "/f/")
+        val downloadKwikSite = providerResult.link.replace(urlRegex, "/f/")
         Log.v(TAG, "downloadKwikSite - $downloadKwikSite")
         val (link, token) = HttpHandler.instance.executeDirect({
             downloadKwikSite.toHttpUrl().newBuilder()
@@ -82,7 +78,7 @@ class KwikStorage private constructor() : Storage {
             ).addHeader("Referer", fUrl.toString())
         }, {
             val result = this.request.url.toString()
-            StorageResult(result, StorageAction.ANY)
+            listOf(StorageResult(result, providerResult.quality))
         })
     }
 

@@ -5,8 +5,7 @@ import com.google.gson.JsonParser
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
-import ru.rofleksey.animewatcher.api.model.Quality
-import ru.rofleksey.animewatcher.api.model.StorageAction
+import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
@@ -24,9 +23,10 @@ class MailRuStorage: Storage {
         val INSTANCE =
             MailRuStorage()
     }
-    override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
+
+    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
         val metadataUrl = HttpHandler.instance.executeDirect({
-            url.toHttpUrl().newBuilder()
+            providerResult.link.toHttpUrl().newBuilder()
         }, { this }, {
             val doc = Jsoup.parse(this.actualBody())
             val scriptTag = doc.selectFirst(
@@ -39,7 +39,7 @@ class MailRuStorage: Storage {
             ApiUtil.sanitizeScheme(flashVars.get("metadataUrl").asString)
         })
         Log.v(TAG, metadataUrl)
-        val result = HttpHandler.instance.executeDirect({
+        return HttpHandler.instance.executeDirect({
             metadataUrl.toHttpUrl().newBuilder()
         }, { this }, {
             val json = JsonParser.parseString(this.actualBody()).asJsonObject
@@ -49,10 +49,11 @@ class MailRuStorage: Storage {
                 Pair(ApiUtil.strToQuality(qualityString), curUrl)
             }
             Log.v(TAG, links.toString())
-            ApiUtil.pickQuality(links, prefQuality)
-        })
-        return StorageResult(result, StorageAction.DOWNLOAD_ONLY).also {
-            it.headers["Cookie"] = HttpHandler.instance.getCookiesString(metadataUrl)
+            links
+        }).map {
+            StorageResult(it.second, it.first).also { storageResult ->
+                storageResult.headers["Cookie"] = HttpHandler.instance.getCookiesString(metadataUrl)
+            }
         }
     }
 

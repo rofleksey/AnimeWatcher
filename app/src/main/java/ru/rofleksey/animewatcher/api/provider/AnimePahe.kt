@@ -1,20 +1,18 @@
 package ru.rofleksey.animewatcher.api.provider
 
 import android.content.Context
-import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.JsonParser
-import okhttp3.HttpUrl
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
+import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.ProviderStats
-import ru.rofleksey.animewatcher.api.model.Quality
 import ru.rofleksey.animewatcher.api.model.TitleInfo
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 
-class AnimePahe : AnimeProvider {
+class AnimePahe(context: Context) : AnimeProvider(context) {
     companion object {
         private const val TAG = "AnimePahe"
         private const val BASE_URL = "https://animepahe.com"
@@ -23,6 +21,7 @@ class AnimePahe : AnimeProvider {
     }
 
     override suspend fun search(title: String): List<TitleInfo> {
+        bypass()
         return HttpHandler.instance.executeDirect({
             this.scheme("https")
                 .host(HOST)
@@ -34,6 +33,10 @@ class AnimePahe : AnimeProvider {
             val obj = gson.fromJson(this.actualBody(), PaheTitleResponse::class.java)
             obj.toTitleInfo()
         })
+    }
+
+    override suspend fun updateTitleMeta(titleInfo: TitleInfo) {
+        bypass()
     }
 
     override suspend fun getEpisodeList(titleInfo: TitleInfo, page: Int): List<EpisodeInfo> {
@@ -55,9 +58,9 @@ class AnimePahe : AnimeProvider {
 
     override suspend fun getStorageLinks(
         titleInfo: TitleInfo,
-        episodeInfo: EpisodeInfo,
-        prefQuality: Quality
-    ): List<String> {
+        episodeInfo: EpisodeInfo
+    ): List<ProviderResult> {
+        bypass()
         return HttpHandler.instance.executeDirect({
             this.scheme("https")
                 .host(HOST)
@@ -69,34 +72,13 @@ class AnimePahe : AnimeProvider {
             val obj = JsonParser.parseString(this.actualBody()).asJsonObject
             val data = obj.getAsJsonObject("data")
             val ep = data.getAsJsonObject(episodeInfo["id"])
-            val links = mutableListOf<Pair<Quality, String>>()
+            val links = mutableListOf<ProviderResult>()
             for (prop in ep.entrySet()) {
                 val quality = ApiUtil.strToQuality(prop.key)
-                links.add(Pair(quality, prop.value.asJsonObject.get("url").asString))
+                links.add(ProviderResult(prop.value.asJsonObject.get("url").asString, quality))
             }
-            listOf(ApiUtil.pickQuality(links, prefQuality))
+            links
         })
-    }
-
-    override suspend fun init(
-        context: Context,
-        prefs: SharedPreferences,
-        updateStatus: (title: String) -> Unit
-    ) {
-        updateStatus("Initializing AnimePahe...")
-        bypassCloudflare(
-            context, HttpUrl.Builder()
-                .scheme("https")
-                .host(HOST)
-                .build()
-        )
-        updateStatus("Initializing AnimePahe images...")
-        bypassCloudflare(
-            context, HttpUrl.Builder()
-                .scheme("https")
-                .host("i.$HOST")
-                .build()
-        )
     }
 
     override fun stats(): ProviderStats {
@@ -109,8 +91,9 @@ class AnimePahe : AnimeProvider {
         )
     }
 
-    override fun clearCache() {
-
+    private suspend fun bypass() {
+        bypassCloudflare(context, host = HOST, title = "animepahe", cookieHost = HOST)
+        bypassCloudflare(context, host = "i.$HOST", title = "animepahe", cookieHost = HOST)
     }
 
 }

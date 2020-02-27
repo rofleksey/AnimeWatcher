@@ -1,18 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/colorBackground"
+    android:id="@+id/title_activity_parent"
     android:fitsSystemWindows="true">
+
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/empty_background"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:elevation="1dp"
+        android:visibility="gone"
+        app:lottie_autoPlay="true"
+        app:layout_constrainedHeight="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:lottie_loop="true"
+        app:lottie_rawRes="@raw/happy_blob"
+        app:lottie_speed="0.5" />
+
+    <TextView
+        android:id="@+id/empty_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/overpass_mono"
+        android:gravity="center"
+        android:textColor="@color/colorWhite"
+        android:text="Hi! This list is empty :)"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/empty_background" />
+
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:elevation="2dp"
         android:scrollbars="vertical"
-        android:elevation="1dp"
         android:visibility="gone"
         android:gravity="start"
         app:layout_constrainedHeight="true"
@@ -21,31 +53,5 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.0" />
-
-    <TextView
-        android:id="@+id/loading_text"
-        android:layout_height="wrap_content"
-        android:layout_width="wrap_content"
-        android:textSize="13sp"
-        android:fontFamily="@font/death_note"
-        android:textColor="@color/colorWhite"
-        android:gravity="start"
-        app:layout_constrainedWidth="true"
-        app:layout_constraintStart_toEndOf="@id/loading"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"/>
-
-    <com.github.ybq.android.spinkit.SpinKitView
-        android:id="@+id/loading"
-        style="@style/SpinKitView.DoubleBounce"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
-        android:elevation="3dp"
-        android:layout_marginStart="5dp"
-        app:SpinKit_Color="@color/colorWhite"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

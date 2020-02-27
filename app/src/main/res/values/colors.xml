@@ -14,5 +14,6 @@
     <color name="colorDetails">#6C515F</color>
     <color name="colorLightGray">#B7BBC6</color>
     <color name="colorHighlight">#7C899A</color>
+    <color name="colorSpotlight">#BF000000</color>
     <color name="design_snackbar_background_color" tools:override="true">@color/colorAccent</color>
 </resources>

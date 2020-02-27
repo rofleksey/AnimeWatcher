@@ -4,8 +4,7 @@ import android.util.Log
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
-import ru.rofleksey.animewatcher.api.model.Quality
-import ru.rofleksey.animewatcher.api.model.StorageAction
+import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
@@ -27,9 +26,9 @@ class VidStreamingStorage : Storage {
             VidStreamingStorage()
     }
 
-    override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
-        val urlArg = ApiUtil.sanitizeScheme(url)
-        Log.v(TAG, url)
+    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
+        val urlArg = ApiUtil.sanitizeScheme(providerResult.link)
+        Log.v(TAG, providerResult.link)
         val redirect = HttpHandler.instance.executeDirect({
             urlArg.toHttpUrl().newBuilder()
         }, { this }, {
@@ -51,7 +50,7 @@ class VidStreamingStorage : Storage {
             if (links.isEmpty()) {
                 throw IOException("Can't find link to mp4")
             }
-            StorageResult(links.first(), StorageAction.CUSTOM_ONLY)
+            listOf(StorageResult(links.first(), providerResult.quality))
         })
     }
 

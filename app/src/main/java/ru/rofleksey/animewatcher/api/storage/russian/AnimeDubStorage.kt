@@ -2,8 +2,7 @@ package ru.rofleksey.animewatcher.api.storage.russian
 
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import ru.rofleksey.animewatcher.api.Storage
-import ru.rofleksey.animewatcher.api.model.Quality
-import ru.rofleksey.animewatcher.api.model.StorageAction
+import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
 import java.io.IOException
 
@@ -25,8 +24,9 @@ class AnimeDubStorage: Storage {
     override val name: String
         get() = NAME
 
-    override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
-        val link: String = url.toHttpUrl().queryParameter("file") ?: throw IOException("invalid playerjs query")
-        return StorageResult(link, StorageAction.ANY)
+    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
+        val link: String = providerResult.link.toHttpUrl().queryParameter("file")
+            ?: throw IOException("invalid playerjs query")
+        return listOf(StorageResult(link, providerResult.quality))
     }
 }

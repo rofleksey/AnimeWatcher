@@ -1,7 +1,6 @@
 package ru.rofleksey.animewatcher.api.provider
 
 import android.content.Context
-import android.content.SharedPreferences
 import ru.rofleksey.animewatcher.api.AnimeProvider
 
 class ProviderFactory {
@@ -12,20 +11,13 @@ class ProviderFactory {
         const val DEFAULT = GOGOANIME
 
         @Throws(NoSuchElementException::class)
-        fun get(name: String): AnimeProvider {
+        fun get(context: Context, name: String): AnimeProvider {
             return when (name) {
-                ANIMEPAHE -> AnimePahe()
-                ANIMEDUB -> AnimeDub()
-                GOGOANIME -> GogoAnime()
+                ANIMEPAHE -> AnimePahe(context)
+                ANIMEDUB -> AnimeDub(context)
+                GOGOANIME -> GogoAnime(context)
                 else -> throw NoSuchElementException("Invalid anime provider")
             }
-        }
-
-        suspend fun init(
-            context: Context, prefs: SharedPreferences,
-            updateStatus: (title: String) -> Unit
-        ) {
-            AnimePahe().init(context, prefs, updateStatus)
         }
     }
 }

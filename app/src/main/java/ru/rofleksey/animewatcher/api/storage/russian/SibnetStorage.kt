@@ -5,8 +5,7 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
-import ru.rofleksey.animewatcher.api.model.Quality
-import ru.rofleksey.animewatcher.api.model.StorageAction
+import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
@@ -25,9 +24,10 @@ class SibnetStorage: Storage {
         val INSTANCE =
             SibnetStorage()
     }
-    override suspend fun extract(url: String, prefQuality: Quality): StorageResult {
+
+    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
         val redirectUrl = HttpHandler.instance.executeDirect({
-            url.toHttpUrl().newBuilder()
+            providerResult.link.toHttpUrl().newBuilder()
         }, { this }, {
             val doc = Jsoup.parse(this.actualBody())
             val scriptTag = doc.selectFirst(
@@ -46,8 +46,8 @@ class SibnetStorage: Storage {
         })
         return HttpHandler.instance.executeDirect({
             redirectUrl.toHttpUrl().newBuilder()
-        }, { this.addHeader("Referer", url) }, {
-            StorageResult(this.request.url.toString(), StorageAction.ANY)
+        }, { this.addHeader("Referer", providerResult.link) }, {
+            listOf(StorageResult(this.request.url.toString(), providerResult.quality))
         })
     }
 
