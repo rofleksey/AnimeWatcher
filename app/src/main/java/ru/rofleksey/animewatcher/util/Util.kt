@@ -5,6 +5,9 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
@@ -52,6 +55,27 @@ class Util {
 
         fun toast(context: Context, str: String) {
             Toast.makeText(context, str, Toast.LENGTH_LONG).show()
+        }
+
+        fun vibrate(context: Context, duration: Long) {
+            try {
+                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                if (!v.hasVibrator()) {
+                    return
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(
+                        VibrationEffect.createOneShot(
+                            duration,
+                            VibrationEffect.DEFAULT_AMPLITUDE
+                        )
+                    )
+                } else { //deprecated in API 26
+                    v.vibrate(duration)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         fun sanitizeForFileName(s: String): String {

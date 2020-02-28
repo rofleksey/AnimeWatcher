@@ -26,6 +26,8 @@ import com.afollestad.materialdialogs.list.listItems
 import com.airbnb.lottie.LottieAnimationView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.daimajia.androidanimations.library.Techniques
+import com.daimajia.androidanimations.library.YoYo
 import com.github.ybq.android.spinkit.SpinKitView
 import com.mikepenz.iconics.view.IconicsImageButton
 import jp.wasabeef.recyclerview.animators.FadeInAnimator
@@ -36,6 +38,7 @@ import ru.rofleksey.animewatcher.api.provider.ProviderFactory
 import ru.rofleksey.animewatcher.database.TitleStorage
 import ru.rofleksey.animewatcher.database.TitleStorageEntry
 import ru.rofleksey.animewatcher.util.Debounce
+import ru.rofleksey.animewatcher.util.Util
 import ru.rofleksey.animewatcher.util.Util.Companion.toast
 import kotlin.system.measureTimeMillis
 
@@ -47,6 +50,7 @@ class SearchActivity : AppCompatActivity() {
         private const val SEARCH_DELAY = 350L
         private const val ITEM_MARGIN = 30
         private const val SEARCH_HINT = "Search on"
+        private const val TAPS_TILL_SECRET = 5
     }
 
     private lateinit var sharedPreferences: SharedPreferences
@@ -61,6 +65,8 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var buttonProviders: IconicsImageButton
     private lateinit var emptyBackground: LottieAnimationView
     private lateinit var emptyText: TextView
+
+    private var countTillSecretActivity = TAPS_TILL_SECRET
 
     private lateinit var titleStorage: TitleStorage
     private lateinit var provider: AnimeProvider
@@ -178,6 +184,20 @@ class SearchActivity : AppCompatActivity() {
         emptyText = findViewById(R.id.empty_text)
         loadingView = findViewById(R.id.loading)
 
+        emptyBackground.setOnClickListener {
+            Util.vibrate(this, 20)
+            countTillSecretActivity -= 1
+            YoYo
+                .with(Techniques.Shake)
+                .duration(150)
+                .playOn(emptyBackground)
+            if (countTillSecretActivity == 0) {
+                countTillSecretActivity = TAPS_TILL_SECRET
+                val searchIntent = Intent(this, SecretActivity::class.java)
+                startActivity(searchIntent)
+            }
+        }
+
         recyclerView = findViewById(R.id.recycler_view)
         recyclerView.itemAnimator = FadeInAnimator()
         recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
@@ -208,9 +228,11 @@ class SearchActivity : AppCompatActivity() {
         if (on && titleData.isEmpty()) {
             emptyBackground.visibility = View.VISIBLE
             emptyText.visibility = View.VISIBLE
+            recyclerView.visibility = View.GONE
         } else {
             emptyBackground.visibility = View.GONE
             emptyText.visibility = View.GONE
+            recyclerView.visibility = View.VISIBLE
         }
     }
 

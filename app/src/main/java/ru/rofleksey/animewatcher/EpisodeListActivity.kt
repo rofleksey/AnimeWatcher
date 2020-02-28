@@ -247,7 +247,7 @@ class EpisodeListActivity : AppCompatActivity() {
         Log.v(TAG, "updateDownloadState()")
         var changedResult = false
         titleEntry.downloads.entries.forEach { entry ->
-            var changed = false;
+            var changed = false
             val query = DownloadManager.Query()
             query.setFilterById(entry.value.id)
             val result = downloadManager.query(query)
@@ -402,34 +402,36 @@ class EpisodeListActivity : AppCompatActivity() {
             holder.view.setOnLongClickListener {
                 val downloadEntry =
                     titleEntry.downloads[item.name] ?: return@setOnLongClickListener false
-                val items = listOf("Open", "Delete")
-                MaterialDialog(this@EpisodeListActivity).show {
-                    listItems(items = items) { dialog, index, text ->
-                        if (text == "Open") {
-                            if (downloadEntry.file == null || !File(downloadEntry.file).exists()) {
-                                Util.toast(
-                                    this@EpisodeListActivity,
-                                    "File ${downloadEntry.file} doesn't exist!"
-                                )
-                                return@listItems
-                            }
-                            Util.openDefaultFile(this@EpisodeListActivity, downloadEntry.file)
-                        } else if (text == "Delete") {
-                            MaterialDialog(this@EpisodeListActivity).show {
-                                title(text = "Delete file")
-                                message(text = "Remove download file of episode #'${item.name}?'")
-                                positiveButton(text = "Yes") {
-                                    File(downloadEntry.file!!).delete()
-                                    titleEntry.downloads.remove(item.name)
-                                    adapter.notifyItemChanged(holder.adapterPosition)
-                                    titleStorage.save()
+                if (downloadEntry.state == EpisodeDownloadState.FINISHED) {
+                    val items = listOf("Open", "Delete")
+                    MaterialDialog(this@EpisodeListActivity).show {
+                        listItems(items = items) { dialog, index, text ->
+                            if (text == "Open") {
+                                if (downloadEntry.file == null || !File(downloadEntry.file).exists()) {
+                                    Util.toast(
+                                        this@EpisodeListActivity,
+                                        "File ${downloadEntry.file} doesn't exist!"
+                                    )
+                                    return@listItems
                                 }
-                                negativeButton(text = "No")
+                                Util.openDefaultFile(this@EpisodeListActivity, downloadEntry.file)
+                            } else if (text == "Delete") {
+                                MaterialDialog(this@EpisodeListActivity).show {
+                                    title(text = "Delete file")
+                                    message(text = "Remove download file of episode #'${item.name}?'")
+                                    positiveButton(text = "Yes") {
+                                        File(downloadEntry.file!!).delete()
+                                        titleEntry.downloads.remove(item.name)
+                                        adapter.notifyItemChanged(holder.adapterPosition)
+                                        titleStorage.save()
+                                    }
+                                    negativeButton(text = "No")
+                                }
                             }
                         }
-                    }
-                    onDismiss {
+                        onDismiss {
 
+                        }
                     }
                 }
                 true
