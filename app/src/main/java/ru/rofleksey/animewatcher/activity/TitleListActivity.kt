@@ -1,6 +1,7 @@
-package ru.rofleksey.animewatcher
+package ru.rofleksey.animewatcher.activity
 
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -32,10 +33,12 @@ import com.takusemba.spotlight.effet.RippleEffect
 import com.takusemba.spotlight.shape.Circle
 import jp.wasabeef.recyclerview.animators.ScaleInAnimator
 import kotlinx.coroutines.*
+import ru.rofleksey.animewatcher.R
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
 import ru.rofleksey.animewatcher.database.TitleStorage
 import ru.rofleksey.animewatcher.database.TitleStorageEntry
-import ru.rofleksey.animewatcher.util.Util
+import ru.rofleksey.animewatcher.util.AnimeUtils
+import java.io.File
 
 
 class TitleListActivity : AppCompatActivity() {
@@ -47,6 +50,7 @@ class TitleListActivity : AppCompatActivity() {
 
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var imm: InputMethodManager
+    private lateinit var downloadManager: DownloadManager
 
     private lateinit var actionBarView: ViewGroup
     private lateinit var recyclerView: RecyclerView
@@ -63,6 +67,7 @@ class TitleListActivity : AppCompatActivity() {
     private val titleData = ArrayList<TitleStorageEntry>()
     private var job: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
+    private var shouldExecuteOnResume: Boolean = false
 
     @SuppressLint("InflateParams")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,6 +75,8 @@ class TitleListActivity : AppCompatActivity() {
         setContentView(R.layout.activity_title_list)
 
         contentView = findViewById(R.id.title_activity_parent)
+
+        downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         sharedPreferences = getSharedPreferences("animewatcher", Context.MODE_PRIVATE)
         //sharedPreferences.edit().clear().commit()
@@ -118,7 +125,8 @@ class TitleListActivity : AppCompatActivity() {
 //                if (pos != parent.adapter!!.itemCount - 1) {
 //                    outRect.bottom = ITEM_MARGIN
 //                }
-                outRect.top = ITEM_MARGIN
+                outRect.top =
+                    ITEM_MARGIN
             }
         })
         layoutManager = LinearLayoutManager(this)
@@ -134,7 +142,6 @@ class TitleListActivity : AppCompatActivity() {
 //                    loadingText.text = it
 //                }
 //            }
-            titleData.clear()
             titleData.addAll(titleStorage.entryList)
             adapter.notifyItemRangeInserted(0, titleData.size)
             // TODO: ANIMATION
@@ -144,7 +151,10 @@ class TitleListActivity : AppCompatActivity() {
             delay(1000)
             if (!sharedPreferences.contains(SPOTLIGHT_KEY)) {
                 val spotlightView =
-                    Util.spotlightLayout(this@TitleListActivity, "Click here to start searching!")
+                    AnimeUtils.spotlightLayout(
+                        this@TitleListActivity,
+                        "Click here to start searching!"
+                    )
                 val spotlightText: TextView = spotlightView.findViewById(R.id.spotlight_text)
                 val searchButtonTarget = Target.Builder()
                     //.setAnchor(searchButton)
@@ -193,11 +203,15 @@ class TitleListActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        titleStorage = TitleStorage.load(sharedPreferences)
-        titleData.clear()
-        titleData.addAll(titleStorage.entryList)
-        checkEmptyBackground()
-        adapter.notifyDataSetChanged()
+        if (shouldExecuteOnResume) {
+            titleStorage = TitleStorage.load(sharedPreferences)
+            titleData.clear()
+            titleData.addAll(titleStorage.entryList)
+            adapter.notifyDataSetChanged()
+            checkEmptyBackground()
+        } else {
+            shouldExecuteOnResume = true
+        }
     }
 
     private class TitleEntryViewHolder(
@@ -251,11 +265,15 @@ class TitleListActivity : AppCompatActivity() {
                     title(text = "Remove")
                     message(text = "Remove '${item.info.title}' from your watching list?")
                     positiveButton(text = "Yes") {
+                        item.downloads.values.forEach { downloadItem ->
+                            downloadManager.remove(downloadItem.id)
+                            File(downloadItem.file).delete()
+                        }
                         titleStorage.update {
                             it.remove(item)
                         }
                         titleData.remove(item)
-                        Util.toast(this@TitleListActivity, "'${item.info.title}' removed")
+                        AnimeUtils.toast(this@TitleListActivity, "'${item.info.title}' removed")
                         checkEmptyBackground()
                         adapter.notifyItemRemoved(holder.adapterPosition)
                     }

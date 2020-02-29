@@ -7,7 +7,7 @@
     android:layout_height="match_parent"
     android:background="@color/colorBackground"
     android:fitsSystemWindows="true"
-    tools:context=".DownloadActivity">
+    tools:context=".activity.DownloadActivity">
 
     <ImageView
         android:id="@+id/background"

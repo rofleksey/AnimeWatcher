@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorBackground"
+    android:fitsSystemWindows="true"
+    tools:context=".activity.GifSaveActivity">
+
+    <SurfaceView
+        android:id="@+id/surface_view"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:elevation="1dp"
+        android:splitMotionEvents="false"
+        app:layout_constrainedWidth="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/controls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:alpha="0"
+        android:background="@color/colorWhiteTransparent"
+        android:elevation="2dp"
+        android:gravity="center_horizontal"
+        android:padding="1dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.9">
+
+        <com.mikepenz.iconics.view.IconicsImageButton
+            android:id="@+id/button_start"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_margin="10dp"
+            android:background="@color/colorBlack"
+            android:padding="2dp"
+            app:iiv_color="@color/colorWhite"
+            app:iiv_icon="cmd-ray-start" />
+
+        <com.mikepenz.iconics.view.IconicsImageButton
+            android:id="@+id/button_encode"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_margin="10dp"
+            android:background="@color/colorBlack"
+            android:padding="2dp"
+            app:iiv_color="@color/colorWhite"
+            app:iiv_icon="cmd-file-download" />
+
+        <com.mikepenz.iconics.view.IconicsImageButton
+            android:id="@+id/button_shot"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_margin="10dp"
+            android:background="@color/colorBlack"
+            android:padding="2dp"
+            app:iiv_color="@color/colorWhite"
+            app:iiv_icon="cmd-camera-metering-spot" />
+
+        <com.mikepenz.iconics.view.IconicsImageButton
+            android:id="@+id/button_end"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_margin="10dp"
+            android:background="@color/colorBlack"
+            android:padding="2dp"
+            app:iiv_color="@color/colorWhite"
+            app:iiv_icon="cmd-ray-end" />
+
+    </LinearLayout>
+
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/seek_loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:alpha="0"
+        android:background="@color/colorWhiteTransparent"
+        android:clickable="false"
+        android:elevation="3dp"
+        android:focusable="false"
+        android:longClickable="false"
+        android:visibility="gone"
+        app:layout_constrainedHeight="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:lottie_autoPlay="true"
+        app:lottie_loop="true"
+        app:lottie_rawRes="@raw/eye_animation"
+        app:lottie_speed="1.5" />
+
+    <TextView
+        android:id="@+id/seek_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@color/colorGray"
+        android:clickable="false"
+        android:elevation="4dp"
+        android:focusable="false"
+        android:fontFamily="monospace"
+        android:longClickable="false"
+        android:textColor="@color/colorWhite"
+        android:textSize="30sp"
+        android:visibility="gone"
+        app:layout_constrainedWidth="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+
+    <com.github.ybq.android.spinkit.SpinKitView
+        android:id="@+id/loading"
+        style="@style/SpinKitView.Large.Wave"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:alpha="0"
+        android:background="@color/colorBackgroundTransparent"
+        android:elevation="5dp"
+        android:visibility="gone"
+        app:SpinKit_Color="@color/colorWhite"
+        app:layout_constrainedHeight="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

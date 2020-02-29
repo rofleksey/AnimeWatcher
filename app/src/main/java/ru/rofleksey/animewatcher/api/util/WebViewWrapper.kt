@@ -6,7 +6,7 @@ import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebView
 import okhttp3.Cookie
-import ru.rofleksey.animewatcher.util.Util
+import ru.rofleksey.animewatcher.util.AnimeUtils
 
 class WebViewWrapper private constructor(val webView: WebView) {
     companion object {
@@ -22,7 +22,7 @@ class WebViewWrapper private constructor(val webView: WebView) {
             with(webView.settings) {
                 javaScriptEnabled = true
                 javaScriptCanOpenWindowsAutomatically = true
-                userAgentString = Util.USER_AGENT
+                userAgentString = AnimeUtils.USER_AGENT
             }
             return WebViewWrapper(webView)
         }

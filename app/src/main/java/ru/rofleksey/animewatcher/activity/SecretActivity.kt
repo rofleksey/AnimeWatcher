@@ -1,4 +1,4 @@
-package ru.rofleksey.animewatcher
+package ru.rofleksey.animewatcher.activity
 
 import android.media.MediaPlayer
 import android.os.Bundle
@@ -8,6 +8,7 @@ import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.android.synthetic.main.activity_secret.*
+import ru.rofleksey.animewatcher.R
 import java.util.*
 
 
@@ -32,7 +33,10 @@ class SecretActivity : AppCompatActivity() {
             }
         }
         webview.loadUrl("file:///android_res/raw/secret.html")
-        sound = MediaPlayer.create(this, R.raw.king_crimson)
+        sound = MediaPlayer.create(
+            this,
+            R.raw.king_crimson
+        )
         sound.isLooping = true
 
         timer = Timer()

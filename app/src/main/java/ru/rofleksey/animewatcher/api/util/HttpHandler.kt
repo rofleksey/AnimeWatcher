@@ -6,7 +6,7 @@ import okhttp3.*
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.riversun.okhttp3.OkHttp3CookieHelper
-import ru.rofleksey.animewatcher.util.Util
+import ru.rofleksey.animewatcher.util.AnimeUtils
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -28,7 +28,7 @@ class HttpHandler {
         .addInterceptor(Interceptor {
             val originalRequest: Request = it.request()
             val requestWithUserAgent = originalRequest.newBuilder()
-                .header("User-Agent", Util.USER_AGENT)
+                .header("User-Agent", AnimeUtils.USER_AGENT)
                 .build()
             it.proceed(requestWithUserAgent)
         })

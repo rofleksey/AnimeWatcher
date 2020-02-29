@@ -5,8 +5,9 @@
     <color name="colorAccent">#D81B60</color>
     <color name="colorBlack">#000000</color>
     <color name="colorWhite">#FFFFFF</color>
-    <color name="colorWhiteTransparent">#CCFFFFFF</color>
+    <color name="colorWhiteTransparent">#55FFFFFF</color>
     <color name="colorBackground">#282C38</color>
+    <color name="colorBackgroundTransparent">#77282C38</color>
     <color name="colorPanel">#1F232E</color>
     <color name="colorBar">#1F2531</color>
     <color name="colorSpecialBlue">#262C3A</color>

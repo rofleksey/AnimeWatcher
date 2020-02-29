@@ -1,6 +1,7 @@
-package ru.rofleksey.animewatcher
+package ru.rofleksey.animewatcher.activity
 
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -32,14 +33,16 @@ import com.github.ybq.android.spinkit.SpinKitView
 import com.mikepenz.iconics.view.IconicsImageButton
 import jp.wasabeef.recyclerview.animators.FadeInAnimator
 import kotlinx.coroutines.*
+import ru.rofleksey.animewatcher.R
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.TitleInfo
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
 import ru.rofleksey.animewatcher.database.TitleStorage
 import ru.rofleksey.animewatcher.database.TitleStorageEntry
+import ru.rofleksey.animewatcher.util.AnimeUtils
+import ru.rofleksey.animewatcher.util.AnimeUtils.Companion.toast
 import ru.rofleksey.animewatcher.util.Debounce
-import ru.rofleksey.animewatcher.util.Util
-import ru.rofleksey.animewatcher.util.Util.Companion.toast
+import java.io.File
 import kotlin.system.measureTimeMillis
 
 
@@ -55,6 +58,8 @@ class SearchActivity : AppCompatActivity() {
 
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var imm: InputMethodManager
+    private lateinit var downloadManager: DownloadManager
+
 
     private lateinit var loadingView: SpinKitView
     private lateinit var recyclerView: RecyclerView
@@ -66,7 +71,8 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var emptyBackground: LottieAnimationView
     private lateinit var emptyText: TextView
 
-    private var countTillSecretActivity = TAPS_TILL_SECRET
+    private var countTillSecretActivity =
+        TAPS_TILL_SECRET
 
     private lateinit var titleStorage: TitleStorage
     private lateinit var provider: AnimeProvider
@@ -82,6 +88,7 @@ class SearchActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_search)
 
+        downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         sharedPreferences = getSharedPreferences("animewatcher", Context.MODE_PRIVATE)
         val storageMeasure = measureTimeMillis {
             titleStorage = TitleStorage.load(sharedPreferences)
@@ -185,14 +192,15 @@ class SearchActivity : AppCompatActivity() {
         loadingView = findViewById(R.id.loading)
 
         emptyBackground.setOnClickListener {
-            Util.vibrate(this, 20)
+            AnimeUtils.vibrate(this, 20)
             countTillSecretActivity -= 1
             YoYo
                 .with(Techniques.Shake)
                 .duration(150)
                 .playOn(emptyBackground)
             if (countTillSecretActivity == 0) {
-                countTillSecretActivity = TAPS_TILL_SECRET
+                countTillSecretActivity =
+                    TAPS_TILL_SECRET
                 val searchIntent = Intent(this, SecretActivity::class.java)
                 startActivity(searchIntent)
             }
@@ -214,7 +222,8 @@ class SearchActivity : AppCompatActivity() {
 //                if (pos != parent.adapter!!.itemCount - 1) {
 //                    outRect.bottom = ITEM_MARGIN
 //                }
-                outRect.top = ITEM_MARGIN
+                outRect.top =
+                    ITEM_MARGIN
             }
         })
         layoutManager = LinearLayoutManager(this)
@@ -364,7 +373,12 @@ class SearchActivity : AppCompatActivity() {
                         message(text = "Remove '$title' from your watching list?")
                         positiveButton(text = "Yes") {
                             titleStorage.update {
-                                it.remove(titleStorage.findByName(title, providerName))
+                                val entry = titleStorage.findByName(title, providerName)
+                                entry.downloads.values.forEach { downloadItem ->
+                                    downloadManager.remove(downloadItem.id)
+                                    File(downloadItem.file).delete()
+                                }
+                                it.remove(entry)
                             }
                             toast(this@SearchActivity, "'$title' removed")
                             adapter.notifyItemChanged(holder.adapterPosition)

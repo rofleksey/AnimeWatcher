@@ -17,7 +17,7 @@ import ru.rofleksey.animewatcher.api.model.Quality
 import java.io.File
 
 
-class Util {
+class AnimeUtils {
     companion object {
         const val TAG = "animewatcher"
         const val USER_AGENT =

@@ -8,6 +8,8 @@ import org.jsoup.Jsoup
 import ru.rofleksey.animewatcher.api.Storage
 import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
+import ru.rofleksey.animewatcher.api.unpackers.PACKERUnpacker
+import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 import java.net.URI
@@ -20,6 +22,8 @@ class KwikStorage private constructor() : Storage {
         val instance: KwikStorage by lazy { HOLDER.INSTANCE }
 //        private val downloadRegex = Regex("download:'([^']+)'")
         private val urlRegex = Regex("/./")
+        private val tokenRegex = Regex("var [_a-zA-Z0-9]+=\"([^\"]+)\"")
+        private val linkRegex = Regex("action=\"([^\"]+)\"")
     }
 
     private object HOLDER {
@@ -52,13 +56,14 @@ class KwikStorage private constructor() : Storage {
             downloadKwikSite.toHttpUrl().newBuilder()
         }, { this.addHeader("Referer", downloadKwikSite) }, {
             val doc = Jsoup.parse(this.actualBody())
-            val form =
-                doc.selectFirst("#app > main > div > div > div.columns.is-multiline > div:nth-child(2) > div:nth-child(2) > form")
-            val input =
-                doc.selectFirst("#app > main > div > div > div.columns.is-multiline > div:nth-child(2) > div:nth-child(2) > form > input[type=hidden]")
+            val scriptTag = doc.selectFirst("body > script:nth-child(6)")
+            val scriptText = scriptTag.data()
+            Log.v(TAG, "scriptTag.data() = $scriptText")
+            val unpacked = PACKERUnpacker.unpack(scriptText)
+            Log.v(TAG, "unpacked = $unpacked")
             DownloadExtraction(
-                form.attr("action"),
-                input.attr("value")
+                ApiUtil.getRegex(unpacked, linkRegex),
+                ApiUtil.getRegex(unpacked, tokenRegex).reversed()
             )
         })
         // D

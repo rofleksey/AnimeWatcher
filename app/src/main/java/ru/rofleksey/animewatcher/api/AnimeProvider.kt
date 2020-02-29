@@ -13,12 +13,18 @@ import okhttp3.HttpUrl
 import ru.rofleksey.animewatcher.api.model.*
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.WebViewWrapper
-import ru.rofleksey.animewatcher.util.Util
+import ru.rofleksey.animewatcher.util.AnimeUtils
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 abstract class AnimeProvider(val context: Context) {
+    companion object {
+        private const val CLOUDFLARE_TIME_THRESHOLD = 1000 * 60 * 5
+        private const val TAG = "AnimeProvider"
+        private const val CLOUDFLARE_TAG = "CloudflareBypass"
+    }
+
     abstract suspend fun search(title: String): List<TitleInfo>
     abstract suspend fun updateTitleMeta(titleInfo: TitleInfo)
     abstract suspend fun getEpisodeList(titleInfo: TitleInfo, page: Int): List<EpisodeInfo>
@@ -34,7 +40,7 @@ abstract class AnimeProvider(val context: Context) {
         updateTitleMeta(titleInfo)
         for (i in 0..Int.MAX_VALUE) {
             val page = getEpisodeList(titleInfo, i)
-            Log.v("AnimeProvider", "page - $page")
+            Log.v(TAG, "page - $page")
             if (page.isEmpty()) {
                 break
             }
@@ -59,7 +65,7 @@ abstract class AnimeProvider(val context: Context) {
             GlideUrl(
                 url,
                 LazyHeaders.Builder()
-                    .addHeader("User-Agent", Util.USER_AGENT)
+                    .addHeader("User-Agent", AnimeUtils.USER_AGENT)
                     .addHeader("Cookie", cookies)
                     .build()
             )
@@ -74,6 +80,17 @@ abstract class AnimeProvider(val context: Context) {
         title: String,
         cookieHost: String
     ) {
+        val prefs = context.getSharedPreferences("cloudflare", Context.MODE_PRIVATE)
+        val lastTime = prefs.getLong(host, 0)
+        val curTime = System.currentTimeMillis()
+        if (!(curTime - lastTime > CLOUDFLARE_TIME_THRESHOLD || lastTime > curTime)) {
+            Log.v(
+                CLOUDFLARE_TAG,
+                "Skipped, ${(CLOUDFLARE_TIME_THRESHOLD - (curTime - lastTime)) / 1000}s till next bypass"
+            )
+            return
+        }
+        Log.v(CLOUDFLARE_TAG, "bypassing...")
         val url = HttpUrl.Builder()
             .scheme("https")
             .host(host)
@@ -91,7 +108,7 @@ abstract class AnimeProvider(val context: Context) {
                                 cont.resume(Unit)
                             } else {
                                 Log.v(
-                                    "CloudflareBypass",
+                                    CLOUDFLARE_TAG,
                                     "page title = ${webWrapper.webView.title}"
                                 )
                             }
@@ -105,5 +122,7 @@ abstract class AnimeProvider(val context: Context) {
             webWrapper.destroy()
         }
         HttpHandler.instance.saveCookies(url, result)
+        prefs.edit().putLong(host, curTime).apply()
+        Log.v(CLOUDFLARE_TAG, "Bypass OK")
     }
 }

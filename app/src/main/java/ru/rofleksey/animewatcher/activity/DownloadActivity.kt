@@ -1,4 +1,4 @@
-package ru.rofleksey.animewatcher
+package ru.rofleksey.animewatcher.activity
 
 import android.Manifest
 import android.app.DownloadManager
@@ -31,6 +31,7 @@ import com.karumi.dexter.listener.single.BasePermissionListener
 import jp.wasabeef.glide.transformations.BlurTransformation
 import jp.wasabeef.recyclerview.animators.FlipInTopXAnimator
 import kotlinx.coroutines.*
+import ru.rofleksey.animewatcher.R
 import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
@@ -39,8 +40,8 @@ import ru.rofleksey.animewatcher.database.EpisodeDownloadState
 import ru.rofleksey.animewatcher.database.EpisodeDownloadStatus
 import ru.rofleksey.animewatcher.database.TitleStorage
 import ru.rofleksey.animewatcher.database.TitleStorageEntry
-import ru.rofleksey.animewatcher.util.Util
-import ru.rofleksey.animewatcher.util.Util.Companion.toast
+import ru.rofleksey.animewatcher.util.AnimeUtils
+import ru.rofleksey.animewatcher.util.AnimeUtils.Companion.toast
 import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -132,7 +133,8 @@ class DownloadActivity : AppCompatActivity() {
                 parent: RecyclerView,
                 state: RecyclerView.State
             ) {
-                outRect.top = ITEM_MARGIN
+                outRect.top =
+                    ITEM_MARGIN
             }
         })
         layoutManager = LinearLayoutManager(this)
@@ -229,7 +231,7 @@ class DownloadActivity : AppCompatActivity() {
                 } else {
                     downloadData.add(
                         DownloadEntry(
-                            "(${Util.qualityToStr(pair.first.quality)}) - ${pair.second!!.name}",
+                            "(${AnimeUtils.qualityToStr(pair.first.quality)}) - ${pair.second!!.name}",
                             R.drawable.zero2,
                             index,
                             "getting links...",
@@ -252,7 +254,8 @@ class DownloadActivity : AppCompatActivity() {
                         it.entryId == index
                     }
                     try {
-                        downloadData[curIndex].entryType = EntryType.PROCESSING
+                        downloadData[curIndex].entryType =
+                            EntryType.PROCESSING
                         downloadData[curIndex].details = "processing..."
                         adapter.notifyItemChanged(curIndex)
 
@@ -263,7 +266,7 @@ class DownloadActivity : AppCompatActivity() {
                         }.map { result ->
                             Log.v(TAG, "storageLink (${result.quality}) - ${result.link}")
                             DownloadEntry(
-                                "(${Util.qualityToStr(result.quality)}) - ${pair.second!!.name}",
+                                "(${AnimeUtils.qualityToStr(result.quality)}) - ${pair.second!!.name}",
                                 R.drawable.zero2,
                                 index,
                                 "ready",
@@ -277,7 +280,8 @@ class DownloadActivity : AppCompatActivity() {
                         adapter.notifyItemRangeInserted(curIndex, result.size)
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        downloadData[curIndex].entryType = EntryType.ERROR
+                        downloadData[curIndex].entryType =
+                            EntryType.ERROR
                         downloadData[curIndex].details = e.message ?: "ERROR"
                         adapter.notifyItemChanged(curIndex)
                     }
@@ -288,7 +292,12 @@ class DownloadActivity : AppCompatActivity() {
             snackbar =
                 Snackbar.make(refreshLayout, e.message ?: "ERROR", Snackbar.LENGTH_INDEFINITE)
                     .also { it.show() }
-            snackbar?.setBackgroundTint(ContextCompat.getColor(this, R.color.colorPanel))
+            snackbar?.setBackgroundTint(
+                ContextCompat.getColor(
+                    this,
+                    R.color.colorPanel
+                )
+            )
         } finally {
             refreshLayout.isRefreshing = false
         }
@@ -296,7 +305,7 @@ class DownloadActivity : AppCompatActivity() {
 
     private fun download(episodeName: String, result: StorageResult) {
         val downloadTitle = "${titleEntry.info.title}_${episodeName}.mp4"
-        val fileName = Util.sanitizeForFileName(downloadTitle)
+        val fileName = AnimeUtils.sanitizeForFileName(downloadTitle)
         val downloadRequest = DownloadManager.Request(result.link.toUri())
         val description = "Downloading episode #$episodeName of ${titleEntry.info.title}"
         for (entry in result.headers.entries) {
@@ -309,14 +318,14 @@ class DownloadActivity : AppCompatActivity() {
         downloadRequest.setVisibleInDownloadsUi(true)
         downloadRequest.allowScanningByMediaScanner()
         downloadRequest.setDestinationInExternalPublicDir(
-            Environment.DIRECTORY_DOWNLOADS,
+            Environment.DIRECTORY_MOVIES,
             fileName
         )
         val taskId = downloadManager.enqueue(downloadRequest)
         titleEntry.downloads[episodeName] = EpisodeDownloadStatus(
             taskId,
             File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
                 fileName
             ).toString(),
             EpisodeDownloadState.PENDING
@@ -388,7 +397,7 @@ class DownloadActivity : AppCompatActivity() {
             }
             holder.view.setOnLongClickListener {
                 if (item.storageResult != null) {
-                    Util.openDefault(this@DownloadActivity, item.storageResult.link)
+                    AnimeUtils.openDefault(this@DownloadActivity, item.storageResult.link)
                     return@setOnLongClickListener true
                 }
                 return@setOnLongClickListener false
