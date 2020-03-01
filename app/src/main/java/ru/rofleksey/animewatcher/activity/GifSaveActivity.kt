@@ -13,8 +13,10 @@ import android.view.View
 import android.view.Window.FEATURE_NO_TITLE
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.view.GestureDetectorCompat
+import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.callbacks.onDismiss
+import com.afollestad.materialdialogs.list.listItems
 import com.daimajia.androidanimations.library.Techniques
 import com.daimajia.androidanimations.library.YoYo
 import com.google.android.exoplayer2.*
@@ -34,7 +36,6 @@ import java.io.File
 import java.lang.Runnable
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -45,12 +46,14 @@ class GifSaveActivity : AppCompatActivity(),
     companion object {
         const val TAG = "GifSaveActivity"
         const val ARG_FILE = "argFile"
+        const val PLAY_BUTTON_MAX_FRAME = 25
+        const val PLAY_BUTTON_ANIMATION_SPEED = 2.0f
         const val FAST_SEEK_TIME_FAR = 10000L
         const val FAST_SEEK_TIME_NEAR = 75L
         const val SEEK_MULT_FAR = 1f
         const val SEEK_MULT_NEAR = 0.01f
-        const val SEEK_FUNC_MULT = 5f
-        const val SEEK_FUNC_POWER = 2f
+        const val SEEK_FUNC_MULT = 4f
+        const val SEEK_FUNC_POWER = 1.75f
         const val SEEK_ANIMATION_TIME = 150L
         const val CONTROLS_ANIMATION_TIME = 200L
         const val LOADING_ANIMATION_TIME = 450L
@@ -64,9 +67,9 @@ class GifSaveActivity : AppCompatActivity(),
     private val handler = Handler()
 
     private var stopPosition: Long = 0
-    private var scrollStartPosition: Long = 0
+    private var seekStartPosition: Long = 0
     private var scrolling: Boolean = false
-    private val scrollDistance = ScrollDistance(0f, 0f)
+    private val seekDistanceCounter = SeekDistanceCounter(0f, 0f)
     private var shouldExecuteOnResume: Boolean = false
 
     private var gifStartPosition: Long = -1
@@ -79,9 +82,8 @@ class GifSaveActivity : AppCompatActivity(),
     private var job: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
-    inner class ScrollDistance(var dx: Float, var dy: Float) {
+    inner class SeekDistanceCounter(var dx: Float, var dy: Float) {
         fun add(x: Float, y: Float) {
-            Log.v(TAG, "dx, dy = $x, $y")
             dx += sign(x) * SEEK_FUNC_MULT * abs(x).pow(SEEK_FUNC_POWER)
             dy += sign(y) * SEEK_FUNC_MULT * abs(y).pow(SEEK_FUNC_POWER)
         }
@@ -92,6 +94,9 @@ class GifSaveActivity : AppCompatActivity(),
         }
 
         fun seekValue(): Float {
+            if (abs(dy) > abs(dx)) {
+                return 0f
+            }
             return if (!exoPlayer.isPlaying) -dx * SEEK_MULT_NEAR else -dx * SEEK_MULT_FAR
         }
     }
@@ -100,8 +105,8 @@ class GifSaveActivity : AppCompatActivity(),
         super.onCreate(savedInstanceState)
         requestWindowFeature(FEATURE_NO_TITLE)
         window.setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN
+            WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         )
         supportActionBar?.hide()
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
@@ -116,26 +121,43 @@ class GifSaveActivity : AppCompatActivity(),
             }
             if (event.action == MotionEvent.ACTION_UP && scrolling) {
                 Log.v(TAG, "scroll end")
-                val seekValue = scrollDistance.seekValue()
+                val seekValue = seekDistanceCounter.seekValue()
                 seek_text.visibility = View.GONE
                 val newPos = max(0f, (exoPlayer.currentPosition + seekValue)).toLong()
                 if (newPos != exoPlayer.currentPosition) {
                     exoPlayer.seekTo(newPos)
                 }
                 scrolling = false
-                scrollDistance.reset()
+                seekDistanceCounter.reset()
             }
             false
+        }
+        surface_view.setOnSystemUiVisibilityChangeListener { visibility ->
+            if (visibility and View.SYSTEM_UI_FLAG_FULLSCREEN == 0) {
+                showControls(true)
+            }
         }
         button_start.setOnClickListener {
             AnimeUtils.vibrate(this, 20)
             AnimeUtils.toast(this, "Start set")
             setIntervals(exoPlayer.currentPosition, gifEndPosition)
         }
+        button_start.setOnLongClickListener {
+            AnimeUtils.vibrate(this, 20)
+            AnimeUtils.toast(this, "Start reset")
+            setIntervals(-1, gifEndPosition)
+            true
+        }
         button_end.setOnClickListener {
             AnimeUtils.vibrate(this, 20)
             AnimeUtils.toast(this, "End set")
             setIntervals(gifStartPosition, exoPlayer.currentPosition)
+        }
+        button_end.setOnLongClickListener {
+            AnimeUtils.vibrate(this, 20)
+            AnimeUtils.toast(this, "End reset")
+            setIntervals(gifStartPosition, -1)
+            true
         }
         button_shot.setOnClickListener {
             showControls(false)
@@ -161,9 +183,16 @@ class GifSaveActivity : AppCompatActivity(),
             }
             saveGif()
         }
+        button_play.setMinAndMaxFrame(0, PLAY_BUTTON_MAX_FRAME)
+        button_play.setOnClickListener {
+            togglePlay()
+        }
         if (savedInstanceState != null) {
             stopPosition = savedInstanceState.getLong("stopPosition")
-            Log.v(TAG, "lifecycle: restored stopPosition = $stopPosition")
+            gifStartPosition = savedInstanceState.getLong("gifStartPosition")
+            gifEndPosition = savedInstanceState.getLong("gifEndPosition")
+            setIntervals(gifStartPosition, gifEndPosition)
+            Log.v(TAG, "lifecycle: restored vars from savedInstanceState")
         }
     }
 
@@ -209,6 +238,7 @@ class GifSaveActivity : AppCompatActivity(),
                 playbackState: Int
             ) {
                 if (playbackState == Player.STATE_READY) {
+                    updateAspectRatio()
                     if (seekProcessing) {
                         seekProcessing = false
                         if (seek_loading.visibility == View.VISIBLE) {
@@ -224,7 +254,6 @@ class GifSaveActivity : AppCompatActivity(),
                             }
                         }
                     }
-                    //exoPlayer.playWhenReady = true
                 }
             }
         })
@@ -238,7 +267,15 @@ class GifSaveActivity : AppCompatActivity(),
             ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(Uri.parse(filePath))
         )
+        updateAspectRatio()
         exoPlayer.playWhenReady = true
+    }
+
+    private fun updateAspectRatio() {
+        val format = exoPlayer.videoFormat
+        if (format != null) {
+            aspect_ration_frame_layout.setAspectRatio(format.width.toFloat() / format.height)
+        }
     }
 
     override fun onStart() {
@@ -253,23 +290,35 @@ class GifSaveActivity : AppCompatActivity(),
     override fun onResume() {
         Log.v(TAG, "lifecycle: onResume")
         super.onResume()
-        if (shouldExecuteOnResume) {
-            exoPlayer.playWhenReady = true
+        window.decorView.apply {
+            systemUiVisibility =
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
+        showControls(true)
         shouldExecuteOnResume = true
+        exoPlayer.playWhenReady = true
+        button_play.speed = -PLAY_BUTTON_ANIMATION_SPEED
+        button_play.playAnimation()
     }
 
     override fun onPause() {
         Log.v(TAG, "lifecycle: onPause")
         super.onPause()
         exoPlayer.stop()
+        seekProcessing = false
+
+        seek_loading.visibility = View.GONE
+        seek_text.visibility = View.GONE
+        seekDistanceCounter.reset()
         stopPosition = exoPlayer.currentPosition
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putLong("stopPosition", stopPosition)
-        Log.v(TAG, "lifecycle: stored stopPosition = $stopPosition")
+        outState.putLong("gifStartPosition", gifStartPosition)
+        outState.putLong("gifEndPosition", gifEndPosition)
+        Log.v(TAG, "lifecycle: stored vars in onSaveInstanceState")
     }
 
     override fun onStop() {
@@ -388,27 +437,60 @@ class GifSaveActivity : AppCompatActivity(),
         runJob { app ->
             val startSeconds = gifStartPosition / 1000f
             val duration = gifEndPosition / 1000f - startSeconds
-            val gifFileName = "${File(filePath).name}_${Random.nextLong()}.gif"
             val inputPath = File(filePath).canonicalPath
+            val items = listOf("gif", "mp4", "mp3")
+            val ext = suspendCancellableCoroutine<CharSequence> { cont ->
+                var chosen = false
+                MaterialDialog(this).show {
+                    listItems(items = items) { dialog, index, text ->
+                        chosen = true
+                        cont.resume(text)
+                    }
+                    onDismiss {
+                        if (!chosen) {
+                            cont.resumeWithException(Exception("No format chosen!"))
+                        }
+                    }
+                    cont.invokeOnCancellation {
+                        this.dismiss()
+                    }
+                }
+            }
+            val outputFileName = "${File(filePath).name}_${Random.nextLong()}.${ext}"
             Log.v(TAG, "FFmpeg processing started!")
-            val result = suspendCoroutine<String> { cont ->
-                app.execute(
-                    arrayOf(
-                        "-ss",
-                        startSeconds.toString(),
-                        "-t",
-                        duration.toString(),
-                        "-i",
-                        inputPath,
-                        "-loop",
-                        "0",
-                        "-vf",
-                        "fps=30,scale=960:-1",
-                        File(
-                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-                            gifFileName
-                        ).toString()
-                    ), object :
+            val result = suspendCancellableCoroutine<String> { cont ->
+                val task = app.execute(
+                    if (ext == "gif") {
+                        arrayOf(
+                            "-ss",
+                            startSeconds.toString(),
+                            "-t",
+                            duration.toString(),
+                            "-i",
+                            inputPath,
+                            "-loop",
+                            "0",
+                            "-vf",
+                            "fps=30,scale=960:-1",
+                            File(
+                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                                outputFileName
+                            ).toString()
+                        )
+                    } else {
+                        arrayOf(
+                            "-ss",
+                            startSeconds.toString(),
+                            "-t",
+                            duration.toString(),
+                            "-i",
+                            inputPath,
+                            File(
+                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                                outputFileName
+                            ).toString()
+                        )
+                    }, object :
                         ExecuteBinaryResponseHandler() {
                         override fun onFailure(message: String) {
                             cont.resumeWithException(Exception(message))
@@ -418,54 +500,21 @@ class GifSaveActivity : AppCompatActivity(),
                             cont.resume(message)
                         }
                     })
+                cont.invokeOnCancellation {
+                    task.sendQuitSignal()
+                }
             }
             Log.v(TAG, "result = $result")
             AnimeUtils.vibrate(this@GifSaveActivity, 20)
-            AnimeUtils.toast(this@GifSaveActivity, "Result saved to $gifFileName")
+            AnimeUtils.toast(this@GifSaveActivity, "Result saved to $outputFileName")
         }
     }
 
     private fun setIntervals(start: Long, end: Long) {
         gifStartPosition = start
         gifEndPosition = end
-        button_start.setBackgroundColor(
-            ContextCompat.getColor(
-                this, when {
-                    start < 0L -> {
-                        R.color.colorBlack
-                    }
-                    start >= 0L -> {
-                        R.color.accent
-                    }
-                    else -> R.color.colorBlack
-                }
-            )
-        )
-        button_end.setBackgroundColor(
-            ContextCompat.getColor(
-                this, when {
-                    end < 0L -> {
-                        R.color.colorBlack
-                    }
-                    end >= 0L -> {
-                        R.color.accent
-                    }
-                    else -> R.color.colorBlack
-                }
-            )
-        )
-        button_encode.setBackgroundColor(
-            ContextCompat.getColor(
-                this, when {
-                    gifEndPosition >= 0 && gifStartPosition in 0 until gifEndPosition -> {
-                        R.color.accent
-                    }
-                    else -> {
-                        R.color.colorBlack
-                    }
-                }
-            )
-        )
+        //
+
     }
 
     private fun formatTimeDelta(s: Int): String {
@@ -474,6 +523,21 @@ class GifSaveActivity : AppCompatActivity(),
             return "${seconds}s"
         }
         return "${seconds / 60}m ${seconds % 60}s"
+    }
+
+    private fun formatVideoTime(time: Long): String {
+        val totalSeconds = max(0, time) / 1000
+        val seconds = totalSeconds % 60
+        val minutes = (totalSeconds / 60) % 60
+        val hours = totalSeconds / 3600
+        if (hours == 0L) {
+            return "${minutes.toString().padStart(2, '0')}:" +
+                    seconds.toString().padStart(2, '0')
+        }
+        return "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(
+            2,
+            '0'
+        )}:${seconds.toString().padStart(2, '0')}"
     }
 
     @SuppressLint("SetTextI18n")
@@ -489,19 +553,21 @@ class GifSaveActivity : AppCompatActivity(),
         }
         if (!scrolling) {
             scrolling = true
-            scrollStartPosition = exoPlayer.currentPosition
+            seekStartPosition = exoPlayer.currentPosition
             return true
         }
-        scrollDistance.add(distanceX, distanceY)
-        if (abs(scrollDistance.dx) > 0) {
-            val seekVal = scrollDistance.seekValue()
+        seekDistanceCounter.add(distanceX, distanceY)
+        if (abs(seekDistanceCounter.dx) > 0) {
+            val seekVal = seekDistanceCounter.seekValue()
             seek_text.visibility = View.VISIBLE
             val prefix = if (seekVal < 0) "<<" else ">>"
             if (exoPlayer.isPlaying) {
                 val seconds = ceil(seekVal / 1000.0).toInt()
-                seek_text.text = "$prefix ${formatTimeDelta(seconds)}"
+                seek_text.text =
+                    "$prefix ${formatTimeDelta(seconds)} (${formatVideoTime((exoPlayer.currentPosition + seekDistanceCounter.seekValue()).toLong())})"
             } else {
-                seek_text.text = "$prefix ${ceil(seekVal)}ms"
+                val frames = floor(seekVal / getFrameInterval()).toInt()
+                seek_text.text = "$prefix $frames frames"
             }
         } else {
             seek_text.visibility = View.GONE
@@ -538,20 +604,26 @@ class GifSaveActivity : AppCompatActivity(),
             e.x > 3 * surface_view.width / 4 -> {
                 exoPlayer.seekTo(exoPlayer.currentPosition + seekTime)
             }
-            else -> {
-                if (exoPlayer.isPlaying) {
-                    exoPlayer.setSeekParameters(SeekParameters.EXACT)
-                    stopPosition = exoPlayer.currentPosition
-                    Log.v(TAG, "stopPosition = $stopPosition")
-                    exoPlayer.playWhenReady = false
-                    showControls(true)
-                } else {
-                    exoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
-                    exoPlayer.playWhenReady = true
-                }
-            }
+            else -> togglePlay()
         }
         return true
+    }
+
+    private fun togglePlay() {
+        if (exoPlayer.isPlaying) {
+            exoPlayer.setSeekParameters(SeekParameters.EXACT)
+            stopPosition = exoPlayer.currentPosition
+            Log.v(TAG, "stopPosition = $stopPosition")
+            exoPlayer.playWhenReady = false
+            button_play.speed = PLAY_BUTTON_ANIMATION_SPEED
+            button_play.playAnimation()
+            showControls(true)
+        } else {
+            exoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
+            exoPlayer.playWhenReady = true
+            button_play.speed = -PLAY_BUTTON_ANIMATION_SPEED
+            button_play.playAnimation()
+        }
     }
 
     override fun onDoubleTapEvent(e: MotionEvent?): Boolean {
@@ -578,6 +650,9 @@ class GifSaveActivity : AppCompatActivity(),
             // delay hiding
             handler.removeCallbacks(closeControlsRunnable)
             handler.postDelayed(closeControlsRunnable, HIDE_CONTROLS_TIME)
+            window.decorView.apply {
+                systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            }
         } else if (controlsOpen && !show) {
             YoYo
                 .with(Techniques.FadeOut)
@@ -588,6 +663,10 @@ class GifSaveActivity : AppCompatActivity(),
                 .playOn(controls)
             handler.removeCallbacks(closeControlsRunnable)
             controlsOpen = false
+            window.decorView.apply {
+                systemUiVisibility =
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            }
         }
     }
 
