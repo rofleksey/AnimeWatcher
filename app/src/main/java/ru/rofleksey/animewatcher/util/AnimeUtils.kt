@@ -11,10 +11,8 @@ import android.os.Vibrator
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.net.toUri
 import ru.rofleksey.animewatcher.R
 import ru.rofleksey.animewatcher.api.model.Quality
-import java.io.File
 
 
 class AnimeUtils {
@@ -23,12 +21,6 @@ class AnimeUtils {
         const val USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36"
         private val FILENAME_REGEX = Regex("[^a-zA-Z0-9.-]")
-
-        fun openInVlc(context: Context, str: String) {
-            val vlc = Intent(Intent.ACTION_VIEW)
-            vlc.setDataAndType(str.toUri(), "video/*")
-            context.startActivity(vlc)
-        }
 
         fun openInChrome(context: Context, url: String) {
             try {
@@ -44,12 +36,6 @@ class AnimeUtils {
         fun openDefault(context: Context, url: String) {
             val intent = Intent(Intent.ACTION_VIEW)
             intent.setDataAndType(Uri.parse(url), "video/*")
-            context.startActivity(intent)
-        }
-
-        fun openDefaultFile(context: Context, url: String) {
-            val intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(Uri.fromFile(File(url)), "video/*")
             context.startActivity(intent)
         }
 

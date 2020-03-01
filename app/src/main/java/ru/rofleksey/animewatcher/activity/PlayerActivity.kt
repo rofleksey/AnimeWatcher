@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.Window.FEATURE_NO_TITLE
 import android.view.WindowManager
+import android.widget.SeekBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GestureDetectorCompat
 import com.afollestad.materialdialogs.MaterialDialog
@@ -26,7 +27,7 @@ import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultAllocator
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
 import com.google.android.exoplayer2.util.Util
-import kotlinx.android.synthetic.main.activity_gif_save.*
+import kotlinx.android.synthetic.main.activity_player.*
 import kotlinx.coroutines.*
 import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler
 import nl.bravobit.ffmpeg.FFmpeg
@@ -40,7 +41,7 @@ import kotlin.math.*
 import kotlin.random.Random
 
 
-class GifSaveActivity : AppCompatActivity(),
+class PlayerActivity : AppCompatActivity(),
     GestureDetector.OnGestureListener,
     GestureDetector.OnDoubleTapListener {
     companion object {
@@ -58,6 +59,7 @@ class GifSaveActivity : AppCompatActivity(),
         const val CONTROLS_ANIMATION_TIME = 200L
         const val LOADING_ANIMATION_TIME = 450L
         const val HIDE_CONTROLS_TIME = 3500L
+        const val SEEK_BAR_UPDATE_INTERVAL = 100L
     }
 
     private lateinit var filePath: String
@@ -77,6 +79,7 @@ class GifSaveActivity : AppCompatActivity(),
     private var controlsOpen: Boolean = false
 
     private var seekProcessing: Boolean = false
+    private var draggingSeekBar: Boolean = false
     private var seekAnimation: YoYo.YoYoString? = null
 
     private var job: Job? = null
@@ -104,13 +107,12 @@ class GifSaveActivity : AppCompatActivity(),
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(FEATURE_NO_TITLE)
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
         supportActionBar?.hide()
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        setContentView(R.layout.activity_gif_save)
+        setContentView(R.layout.activity_player)
 
         filePath = intent.getStringExtra(ARG_FILE) ?: ""
         gestureDetector = GestureDetectorCompat(this, this)
@@ -186,6 +188,7 @@ class GifSaveActivity : AppCompatActivity(),
         button_play.setMinAndMaxFrame(0, PLAY_BUTTON_MAX_FRAME)
         button_play.setOnClickListener {
             togglePlay()
+            showControls(true)
         }
         if (savedInstanceState != null) {
             stopPosition = savedInstanceState.getLong("stopPosition")
@@ -194,6 +197,28 @@ class GifSaveActivity : AppCompatActivity(),
             setIntervals(gifStartPosition, gifEndPosition)
             Log.v(TAG, "lifecycle: restored vars from savedInstanceState")
         }
+        seek_bar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (draggingSeekBar) {
+                    val dragTime = progress.toLong()
+                    if (dragTime != exoPlayer.currentPosition) {
+                        exoPlayer.seekTo(dragTime)
+                    }
+                    showControls(true)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                draggingSeekBar = true
+                showControls(true)
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                draggingSeekBar = false
+                showControls(true)
+            }
+
+        })
     }
 
     private fun initPlayer() {
@@ -237,6 +262,9 @@ class GifSaveActivity : AppCompatActivity(),
                 playWhenReady: Boolean,
                 playbackState: Int
             ) {
+                if (playbackState != Player.STATE_IDLE && playbackState != Player.STATE_ENDED) {
+                    updateProgress()
+                }
                 if (playbackState == Player.STATE_READY) {
                     updateAspectRatio()
                     if (seekProcessing) {
@@ -306,6 +334,7 @@ class GifSaveActivity : AppCompatActivity(),
         super.onPause()
         exoPlayer.stop()
         seekProcessing = false
+        draggingSeekBar = false
 
         seek_loading.visibility = View.GONE
         seek_text.visibility = View.GONE
@@ -325,6 +354,8 @@ class GifSaveActivity : AppCompatActivity(),
         Log.v(TAG, "lifecycle: onStop")
         super.onStop()
         exoPlayer.release()
+        handler.removeCallbacks(updateProgressRunnable)
+        handler.removeCallbacks(closeControlsRunnable)
     }
 
     override fun onDestroy() {
@@ -369,14 +400,14 @@ class GifSaveActivity : AppCompatActivity(),
             .playOn(loading)
         job = coroutineScope.launch {
             try {
-                val app = FFmpeg.getInstance(this@GifSaveActivity)
+                val app = FFmpeg.getInstance(this@PlayerActivity)
                 if (!app.isSupported) {
                     throw Exception("FFmpeg is not supported")
                 }
                 func(app)
             } catch (e: Exception) {
                 e.printStackTrace()
-                AnimeUtils.toast(this@GifSaveActivity, "error: ${e.message}")
+                AnimeUtils.toast(this@PlayerActivity, "error: ${e.message}")
             } finally {
                 animation.stop()
                 YoYo
@@ -428,8 +459,8 @@ class GifSaveActivity : AppCompatActivity(),
                 }
             }
             Log.v(TAG, "result = $result")
-            AnimeUtils.vibrate(this@GifSaveActivity, 20)
-            AnimeUtils.toast(this@GifSaveActivity, "Result saved to $outputFileName")
+            AnimeUtils.vibrate(this@PlayerActivity, 20)
+            AnimeUtils.toast(this@PlayerActivity, "Result saved to $outputFileName")
         }
     }
 
@@ -505,8 +536,8 @@ class GifSaveActivity : AppCompatActivity(),
                 }
             }
             Log.v(TAG, "result = $result")
-            AnimeUtils.vibrate(this@GifSaveActivity, 20)
-            AnimeUtils.toast(this@GifSaveActivity, "Result saved to $outputFileName")
+            AnimeUtils.vibrate(this@PlayerActivity, 20)
+            AnimeUtils.toast(this@PlayerActivity, "Result saved to $outputFileName")
         }
     }
 
@@ -607,6 +638,23 @@ class GifSaveActivity : AppCompatActivity(),
             else -> togglePlay()
         }
         return true
+    }
+
+    private val updateProgressRunnable = Runnable {
+        updateProgress()
+    }
+
+    private fun updateProgress() {
+        handler.removeCallbacks(updateProgressRunnable)
+        val cur = formatVideoTime(exoPlayer.currentPosition)
+        val remaining = formatVideoTime(exoPlayer.duration - exoPlayer.currentPosition)
+        text_current.text = cur
+        text_remaining.text = remaining
+        if (!draggingSeekBar) {
+            seek_bar.max = exoPlayer.duration.toInt()
+            seek_bar.progress = exoPlayer.currentPosition.toInt()
+        }
+        handler.postDelayed(updateProgressRunnable, SEEK_BAR_UPDATE_INTERVAL)
     }
 
     private fun togglePlay() {

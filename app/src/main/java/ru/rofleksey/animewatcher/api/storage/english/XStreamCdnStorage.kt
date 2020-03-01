@@ -58,6 +58,9 @@ class XStreamCdnStorage : Storage {
             postUrl.newBuilder()
         }, { this.addHeader("Referer", fUrl.toString()).post("".toRequestBody()) }, {
             val obj = JsonParser.parseString(this.actualBody()).asJsonObject
+            if (obj.has("success") && !obj.get("success").asBoolean) {
+                throw Exception(obj.get("data").asString)
+            }
             val links = obj.getAsJsonArray("data").map {
                 val file = it.asJsonObject.get("file").asString
                 val qualityString = it.asJsonObject.get("label").asString

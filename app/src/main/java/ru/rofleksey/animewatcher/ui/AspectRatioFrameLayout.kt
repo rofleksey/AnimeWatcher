@@ -2,6 +2,7 @@ package ru.rofleksey.animewatcher.ui
 
 import android.content.Context
 import android.util.AttributeSet
+import android.util.Log
 import android.widget.FrameLayout
 
 
@@ -11,11 +12,16 @@ class AspectRatioFrameLayout @JvmOverloads constructor(
 ) :
     FrameLayout(context, attrs) {
 
-    private var videoAspectRatio = 0f
+    companion object {
+        private const val TAG = "AspectRatioFrameLayout"
+    }
+
+    private var videoAspectRatio = 1.7777778f
 
     fun setAspectRatio(widthHeightRatio: Float) {
         if (videoAspectRatio != widthHeightRatio) {
             videoAspectRatio = widthHeightRatio
+            Log.v(TAG, "videoAspectRatio = $videoAspectRatio")
             requestLayout()
         }
     }

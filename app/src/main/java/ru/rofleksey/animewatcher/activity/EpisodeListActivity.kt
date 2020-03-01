@@ -407,7 +407,15 @@ class EpisodeListActivity : AppCompatActivity() {
                             )
                             return@setOnClickListener
                         }
-                        AnimeUtils.openInVlc(this@EpisodeListActivity, downloadEntry.file)
+                        val playIntent = Intent(
+                            this@EpisodeListActivity,
+                            PlayerActivity::class.java
+                        )
+                        playIntent.putExtra(
+                            PlayerActivity.ARG_FILE,
+                            downloadEntry.file
+                        )
+                        startActivity(playIntent)
                     }
                 }
             }
@@ -416,11 +424,11 @@ class EpisodeListActivity : AppCompatActivity() {
                     titleEntry.downloads[item.name] ?: return@setOnLongClickListener false
                 when (downloadEntry.state) {
                     EpisodeDownloadState.FINISHED -> {
-                        val items = listOf("Open", "Make GIF", "Delete")
+                        val items = listOf("Play", "Delete")
                         MaterialDialog(this@EpisodeListActivity).show {
                             listItems(items = items) { dialog, index, text ->
                                 when (text) {
-                                    "Open" -> {
+                                    "Play" -> {
                                         if (!File(downloadEntry.file).exists()) {
                                             AnimeUtils.toast(
                                                 this@EpisodeListActivity,
@@ -428,21 +436,10 @@ class EpisodeListActivity : AppCompatActivity() {
                                             )
                                             return@listItems
                                         }
-                                        AnimeUtils.openDefaultFile(
+                                        AnimeUtils.openDefault(
                                             this@EpisodeListActivity,
                                             downloadEntry.file
                                         )
-                                    }
-                                    "Make GIF" -> {
-                                        val gifIntent = Intent(
-                                            this@EpisodeListActivity,
-                                            GifSaveActivity::class.java
-                                        )
-                                        gifIntent.putExtra(
-                                            GifSaveActivity.ARG_FILE,
-                                            downloadEntry.file
-                                        )
-                                        startActivity(gifIntent)
                                     }
                                     "Delete" -> {
                                         MaterialDialog(this@EpisodeListActivity).show {
