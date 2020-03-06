@@ -4,9 +4,9 @@ import android.util.Log
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
-import ru.rofleksey.animewatcher.api.Storage
 import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
+import ru.rofleksey.animewatcher.api.storage.Storage
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody

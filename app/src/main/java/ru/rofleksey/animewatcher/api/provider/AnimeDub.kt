@@ -7,7 +7,6 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MultipartBody
 import org.jsoup.Jsoup
-import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.*
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler

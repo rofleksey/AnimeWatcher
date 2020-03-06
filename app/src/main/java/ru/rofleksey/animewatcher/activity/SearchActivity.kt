@@ -34,8 +34,8 @@ import com.mikepenz.iconics.view.IconicsImageButton
 import jp.wasabeef.recyclerview.animators.FadeInAnimator
 import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.R
-import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.TitleInfo
+import ru.rofleksey.animewatcher.api.provider.AnimeProvider
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
 import ru.rofleksey.animewatcher.database.TitleStorage
 import ru.rofleksey.animewatcher.database.TitleStorageEntry
@@ -168,6 +168,11 @@ class SearchActivity : AppCompatActivity() {
                             providerName = ProviderFactory.GOGOANIME
                             provider = ProviderFactory.get(this@SearchActivity, providerName)
                             toast(this@SearchActivity, "Using GogoAnime")
+                        }
+                        3 -> {
+                            providerName = ProviderFactory.KICKASSANIME
+                            provider = ProviderFactory.get(this@SearchActivity, providerName)
+                            toast(this@SearchActivity, "Using KickassAnime")
                         }
                         else -> {
                             toast(this@SearchActivity, "ERROR: INVALID PROVIDER")

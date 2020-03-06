@@ -51,32 +51,6 @@ class HttpHandler {
         }
     }
 
-    suspend fun <T> execute(
-        urlProcessor: HttpUrl.Builder.() -> HttpUrl.Builder,
-        requestProcessor: Request.Builder.() -> Request.Builder,
-        responseProcessor: Response.() -> T, cache: SimpleCache<T>, s: String = "",
-        ii: Int = 0
-    ): T {
-        val cacheHit = cache.get(s, ii)
-        if (cacheHit != null) {
-            return cacheHit
-        }
-
-        val url = HttpUrl.Builder()
-            .urlProcessor()
-            .build()
-
-        val request = Request.Builder()
-            .requestProcessor()
-            .url(url)
-            .build()
-
-        val response = httpClient.newCall(request).await()
-        val result = response.responseProcessor()
-        cache.set(s, ii, result)
-        return result
-    }
-
     suspend fun <T> executeDirect(
         urlProcessor: HttpUrl.Builder.() -> HttpUrl.Builder,
         requestProcessor: Request.Builder.() -> Request.Builder,

@@ -1,4 +1,4 @@
-package ru.rofleksey.animewatcher.api
+package ru.rofleksey.animewatcher.api.provider
 
 import android.content.Context
 import android.util.Log

@@ -31,8 +31,8 @@ import jp.wasabeef.glide.transformations.gpu.PixelationFilterTransformation
 import jp.wasabeef.recyclerview.animators.LandingAnimator
 import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.R
-import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
+import ru.rofleksey.animewatcher.api.provider.AnimeProvider
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
 import ru.rofleksey.animewatcher.database.EpisodeDownloadState
 import ru.rofleksey.animewatcher.database.TitleStorage

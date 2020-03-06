@@ -1,4 +1,4 @@
-package ru.rofleksey.animewatcher.api.provider
+package ru.rofleksey.animewatcher.api.provider.template
 
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
 

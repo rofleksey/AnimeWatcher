@@ -5,9 +5,9 @@ import com.google.gson.JsonParser
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
-import ru.rofleksey.animewatcher.api.Storage
 import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
+import ru.rofleksey.animewatcher.api.storage.Storage
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody

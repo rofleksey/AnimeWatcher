@@ -1,9 +1,9 @@
 package ru.rofleksey.animewatcher.api.storage.russian
 
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import ru.rofleksey.animewatcher.api.Storage
 import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
+import ru.rofleksey.animewatcher.api.storage.Storage
 import java.io.IOException
 
 class AnimeDubStorage: Storage {

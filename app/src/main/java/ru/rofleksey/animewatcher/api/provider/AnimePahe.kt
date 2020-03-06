@@ -3,11 +3,12 @@ package ru.rofleksey.animewatcher.api.provider
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.JsonParser
-import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
 import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.ProviderStats
 import ru.rofleksey.animewatcher.api.model.TitleInfo
+import ru.rofleksey.animewatcher.api.provider.template.PaheEpisodesResponse
+import ru.rofleksey.animewatcher.api.provider.template.PaheTitleResponse
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody

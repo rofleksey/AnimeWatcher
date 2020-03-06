@@ -11,6 +11,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.ActionBar
@@ -29,12 +30,14 @@ import com.karumi.dexter.listener.PermissionDeniedResponse
 import com.karumi.dexter.listener.PermissionGrantedResponse
 import com.karumi.dexter.listener.single.BasePermissionListener
 import jp.wasabeef.glide.transformations.BlurTransformation
-import jp.wasabeef.recyclerview.animators.FlipInTopXAnimator
+import jp.wasabeef.recyclerview.animators.SlideInLeftAnimator
 import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.R
-import ru.rofleksey.animewatcher.api.AnimeProvider
+import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
+import ru.rofleksey.animewatcher.api.provider.AnimeProvider
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
+import ru.rofleksey.animewatcher.api.storage.Storage
 import ru.rofleksey.animewatcher.api.storage.StorageLocator
 import ru.rofleksey.animewatcher.database.EpisodeDownloadState
 import ru.rofleksey.animewatcher.database.EpisodeDownloadStatus
@@ -43,6 +46,8 @@ import ru.rofleksey.animewatcher.database.TitleStorageEntry
 import ru.rofleksey.animewatcher.util.AnimeUtils
 import ru.rofleksey.animewatcher.util.AnimeUtils.Companion.toast
 import java.io.File
+import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -125,7 +130,9 @@ class DownloadActivity : AppCompatActivity() {
         refreshLayout.isEnabled = true
 
         recyclerView = findViewById(R.id.recycler_view)
-        recyclerView.itemAnimator = FlipInTopXAnimator()
+        recyclerView.itemAnimator = SlideInLeftAnimator().apply {
+            setInterpolator(OvershootInterpolator(1f))
+        }
         recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
             override fun getItemOffsets(
                 outRect: Rect,
@@ -161,17 +168,71 @@ class DownloadActivity : AppCompatActivity() {
     }
 
     enum class EntryType {
-        LINK_WITH_STORAGE, PROCESSING, READY, ERROR, INVALID_STORAGE
+        REDIRECT, LINK_WITH_STORAGE, PROCESSING, READY, ERROR, INVALID_STORAGE
     }
 
     data class DownloadEntry(
         val name: String,
         val image: Int,
-        val entryId: Int,
+        var entryId: Int,
         var details: String,
         var entryType: EntryType,
+        val sourceLink: String,
         val storageResult: StorageResult?
     )
+
+    data class QueueEntry(
+        val providerResult: ProviderResult,
+        val storage: Storage?,
+        val id: Int
+    )
+
+    class IdHolder {
+        var maxId = 0
+
+        fun next(): Int {
+            return maxId++
+        }
+    }
+
+    private fun queueEntryToDownloadEntry(
+        queueEntry: QueueEntry,
+        isRedirect: Boolean
+    ): DownloadEntry {
+        return if (queueEntry.storage == null) {
+            DownloadEntry(
+                "Unsupported storage",
+                R.drawable.placeholder,
+                queueEntry.id,
+                queueEntry.providerResult.link,
+                EntryType.INVALID_STORAGE,
+                queueEntry.providerResult.link,
+                null
+            )
+        } else {
+            if (!isRedirect) {
+                DownloadEntry(
+                    "(${AnimeUtils.qualityToStr(queueEntry.providerResult.quality)}) - ${queueEntry.storage.name}",
+                    R.drawable.zero2,
+                    queueEntry.id,
+                    "getting links...",
+                    EntryType.LINK_WITH_STORAGE,
+                    queueEntry.providerResult.link,
+                    null
+                )
+            } else {
+                DownloadEntry(
+                    "(${AnimeUtils.qualityToStr(queueEntry.providerResult.quality)}) - ${queueEntry.storage.name}",
+                    R.drawable.zero2,
+                    queueEntry.id,
+                    "following redirect...",
+                    EntryType.REDIRECT,
+                    queueEntry.providerResult.link,
+                    null
+                )
+            }
+        }
+    }
 
     private suspend fun process() {
         try {
@@ -185,7 +246,7 @@ class DownloadActivity : AppCompatActivity() {
                 )
             }
             if (links.isEmpty()) {
-                throw Exception("No links were retrieved from $provider")
+                throw Exception("No links were retrieved from $providerName")
             }
             suspendCoroutine<Unit> { cont ->
                 Dexter.withActivity(this@DownloadActivity)
@@ -204,87 +265,101 @@ class DownloadActivity : AppCompatActivity() {
                     })
                     .check()
             }
-            val linksAndStorages = links.map { providerResult ->
-                Pair(providerResult, StorageLocator.locate(providerResult.link))
-            }.sortedWith(
-                compareBy(
-                    { if (it.second == null) 1 else 0 },
-                    { if (it.second == null) 1337 else -it.second!!.score },
-                    { -it.first.quality.num }
-                )
+            val idHolder = IdHolder()
+
+            val comparator: Comparator<QueueEntry> = compareBy(
+                { if (it.storage == null) 1 else 0 },
+                { if (it.storage == null) 1337 else -it.storage.score },
+                { -it.providerResult.quality.num }
             )
+
+            val linksAndStorages = links.map { providerResult ->
+                QueueEntry(
+                    providerResult,
+                    StorageLocator.locate(providerResult.link),
+                    idHolder.next()
+                )
+            }.sortedWith(comparator)
+
+
+
             if (linksAndStorages.isEmpty()) {
                 throw Exception("Failed to determine download method")
             }
-            linksAndStorages.forEachIndexed { index, pair ->
-                if (pair.second == null) {
-                    downloadData.add(
-                        DownloadEntry(
-                            "Unsupported storage",
-                            R.drawable.placeholder,
-                            index,
-                            pair.first.link,
-                            EntryType.INVALID_STORAGE,
-                            null
-                        )
-                    )
-                } else {
-                    downloadData.add(
-                        DownloadEntry(
-                            "(${AnimeUtils.qualityToStr(pair.first.quality)}) - ${pair.second!!.name}",
-                            R.drawable.zero2,
-                            index,
-                            "getting links...",
-                            EntryType.LINK_WITH_STORAGE,
-                            null
-                        )
-                    )
-                }
+            linksAndStorages.forEach { queueEntry ->
+                downloadData.add(queueEntryToDownloadEntry(queueEntry, false))
             }
             adapter.notifyItemRangeInserted(0, downloadData.size)
-            linksAndStorages.forEachIndexed { index, pair ->
-                val storage = pair.second
+            val queue = LinkedList<QueueEntry>()
+            queue.addAll(linksAndStorages)
+            while (queue.isNotEmpty()) {
+                val queueEntry = queue.removeFirst()
+                val listIndex = downloadData.indexOfFirst {
+                    it.entryId == queueEntry.id
+                }
+                val storage = queueEntry.storage
                 if (storage != null) {
-                    val providerResult = pair.first
+                    val providerResult = queueEntry.providerResult
                     Log.v(
                         TAG,
                         "Processing ${storage.name} (${providerResult.quality}): ${providerResult.link}"
                     )
-                    val curIndex = downloadData.indexOfFirst {
-                        it.entryId == index
-                    }
                     try {
-                        downloadData[curIndex].entryType =
+                        downloadData[listIndex].entryType =
                             EntryType.PROCESSING
-                        downloadData[curIndex].details = "processing..."
-                        adapter.notifyItemChanged(curIndex)
+                        downloadData[listIndex].details = "processing..."
+                        adapter.notifyItemChanged(listIndex)
 
                         val result = withContext(Dispatchers.IO) {
                             storage.extract(providerResult)
                         }.sortedBy {
                             -it.quality.num
-                        }.map { result ->
+                        }.flatMap { result ->
                             Log.v(TAG, "storageLink (${result.quality}) - ${result.link}")
-                            DownloadEntry(
-                                "(${AnimeUtils.qualityToStr(result.quality)}) - ${pair.second!!.name}",
-                                R.drawable.zero2,
-                                index,
-                                "ready",
-                                EntryType.READY,
-                                result
-                            )
+                            if (result.isRedirect) {
+                                val alreadyHasLink = downloadData.any { existingEntry ->
+                                    existingEntry.sourceLink == result.link
+                                }
+                                if (!alreadyHasLink) {
+                                    val newEntry = QueueEntry(
+                                        ProviderResult(
+                                            result.link,
+                                            result.quality
+                                        ),
+                                        StorageLocator.locate(result.link),
+                                        idHolder.next()
+                                    )
+                                    queue.addFirst(newEntry)
+                                    listOf(queueEntryToDownloadEntry(newEntry, true))
+                                } else {
+                                    listOf()
+                                }
+                            } else {
+                                listOf(
+                                    DownloadEntry(
+                                        "(${AnimeUtils.qualityToStr(result.quality)}) - ${storage.name}",
+                                        R.drawable.zero2,
+                                        queueEntry.id,
+                                        "ready",
+                                        EntryType.READY,
+                                        result.link,
+                                        result
+                                    )
+                                )
+                            }
                         }
-                        downloadData.removeAt(curIndex)
-                        adapter.notifyItemRemoved(curIndex)
-                        downloadData.addAll(curIndex, result)
-                        adapter.notifyItemRangeInserted(curIndex, result.size)
+                        downloadData.removeAt(listIndex)
+                        adapter.notifyItemRemoved(listIndex)
+                        downloadData.addAll(listIndex, result)
+                        adapter.notifyItemRangeInserted(listIndex, result.size)
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        downloadData[curIndex].entryType =
+                        downloadData[listIndex].entryType =
                             EntryType.ERROR
-                        downloadData[curIndex].details = e.message ?: "ERROR"
-                        adapter.notifyItemChanged(curIndex)
+                        downloadData[listIndex].details = e.message ?: "ERROR"
+                        adapter.notifyItemChanged(listIndex)
                     }
+                    delay(250)
                 }
             }
         } catch (e: Exception) {
@@ -312,6 +387,7 @@ class DownloadActivity : AppCompatActivity() {
             downloadRequest.addRequestHeader(entry.key, entry.value)
             Log.v(TAG, "Setting header ${entry.key}=${entry.value}")
         }
+        downloadRequest.addRequestHeader("User-Agent", AnimeUtils.USER_AGENT)
         downloadRequest.setTitle(downloadTitle)
         downloadRequest.setDescription(description)
         downloadRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -380,6 +456,7 @@ class DownloadActivity : AppCompatActivity() {
                         EntryType.PROCESSING -> R.color.colorHighlight
                         EntryType.ERROR -> R.color.accent
                         EntryType.READY -> R.color.primary
+                        EntryType.REDIRECT -> R.color.colorOrange
                         EntryType.INVALID_STORAGE -> R.color.colorBlack
                     }
                 )

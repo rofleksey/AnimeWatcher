@@ -1,13 +1,13 @@
 package ru.rofleksey.animewatcher.api.provider
 
 import android.content.Context
-import ru.rofleksey.animewatcher.api.AnimeProvider
 
 class ProviderFactory {
     companion object {
         const val ANIMEPAHE = "animepahe"
         const val ANIMEDUB = "animedub"
         const val GOGOANIME = "gogoanime"
+        const val KICKASSANIME = "kickassanime"
         const val DEFAULT = GOGOANIME
 
         @Throws(NoSuchElementException::class)
@@ -16,6 +16,7 @@ class ProviderFactory {
                 ANIMEPAHE -> AnimePahe(context)
                 ANIMEDUB -> AnimeDub(context)
                 GOGOANIME -> GogoAnime(context)
+                KICKASSANIME -> KickassAnime(context)
                 else -> throw NoSuchElementException("Invalid anime provider")
             }
         }

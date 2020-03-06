@@ -83,5 +83,13 @@ class AnimeUtils {
                 "${number}p"
             }
         }
+
+        fun getFileExt(path: String): String {
+            val lastDot = path.lastIndexOf(".")
+            if (lastDot > 0) {
+                return path.substring(lastDot + 1)
+            }
+            return ""
+        }
     }
 }

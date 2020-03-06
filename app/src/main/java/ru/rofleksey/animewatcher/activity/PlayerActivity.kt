@@ -54,7 +54,7 @@ class PlayerActivity : AppCompatActivity(),
         const val SEEK_MULT_FAR = 1f
         const val SEEK_MULT_NEAR = 0.01f
         const val SEEK_FUNC_MULT = 4f
-        const val SEEK_FUNC_POWER = 1.75f
+        const val SEEK_FUNC_POWER = 1.6f
         const val SEEK_ANIMATION_TIME = 150L
         const val CONTROLS_ANIMATION_TIME = 200L
         const val LOADING_ANIMATION_TIME = 450L
@@ -464,6 +464,7 @@ class PlayerActivity : AppCompatActivity(),
         }
     }
 
+    @SuppressLint("DefaultLocale")
     private fun saveGif() {
         runJob { app ->
             val startSeconds = gifStartPosition / 1000f
@@ -491,36 +492,71 @@ class PlayerActivity : AppCompatActivity(),
             Log.v(TAG, "FFmpeg processing started!")
             val result = suspendCancellableCoroutine<String> { cont ->
                 val task = app.execute(
-                    if (ext == "gif") {
-                        arrayOf(
-                            "-ss",
-                            startSeconds.toString(),
-                            "-t",
-                            duration.toString(),
-                            "-i",
-                            inputPath,
-                            "-loop",
-                            "0",
-                            "-vf",
-                            "fps=30,scale=960:-1",
-                            File(
-                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-                                outputFileName
-                            ).toString()
-                        )
-                    } else {
-                        arrayOf(
-                            "-ss",
-                            startSeconds.toString(),
-                            "-t",
-                            duration.toString(),
-                            "-i",
-                            inputPath,
-                            File(
-                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-                                outputFileName
-                            ).toString()
-                        )
+                    when (ext) {
+                        "gif" -> {
+                            arrayOf(
+                                "-ss",
+                                startSeconds.toString(),
+                                "-i",
+                                inputPath,
+                                "-t",
+                                duration.toString(),
+                                "-loop",
+                                "0",
+                                "-vf",
+                                "fps=20,scale=640:-1",
+                                File(
+                                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                                    outputFileName
+                                ).toString()
+                            )
+                        }
+                        "mp4" -> {
+                            if (AnimeUtils.getFileExt(inputPath).toLowerCase() == "mp4") {
+                                arrayOf(
+                                    "-ss",
+                                    startSeconds.toString(),
+                                    "-i",
+                                    inputPath,
+                                    "-t",
+                                    duration.toString(),
+                                    "-c",
+                                    "copy",
+                                    File(
+                                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                                        outputFileName
+                                    ).toString()
+                                )
+                            } else {
+                                arrayOf(
+                                    "-ss",
+                                    startSeconds.toString(),
+                                    "-i",
+                                    inputPath,
+                                    "-t",
+                                    duration.toString(),
+                                    File(
+                                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                                        outputFileName
+                                    ).toString()
+                                )
+                            }
+                        }
+                        "mp3" -> {
+                            arrayOf(
+                                "-ss",
+                                startSeconds.toString(),
+                                "-i",
+                                inputPath,
+                                "-t",
+                                duration.toString(),
+                                File(
+                                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+                                    outputFileName
+                                ).toString()
+                            )
+                        }
+                        else -> arrayOf("--wtf")
                     }, object :
                         ExecuteBinaryResponseHandler() {
                         override fun onFailure(message: String) {

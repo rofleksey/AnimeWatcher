@@ -1,4 +1,4 @@
-package ru.rofleksey.animewatcher.api
+package ru.rofleksey.animewatcher.api.storage
 
 import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult

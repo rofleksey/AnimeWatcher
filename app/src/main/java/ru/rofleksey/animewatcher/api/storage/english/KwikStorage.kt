@@ -5,16 +5,17 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MultipartBody
 import org.jsoup.Jsoup
-import ru.rofleksey.animewatcher.api.Storage
 import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.StorageResult
+import ru.rofleksey.animewatcher.api.storage.Storage
 import ru.rofleksey.animewatcher.api.unpackers.PACKERUnpacker
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 import java.net.URI
 
-class KwikStorage private constructor() : Storage {
+class KwikStorage private constructor() :
+    Storage {
     companion object {
         private const val TAG = "Kwik"
         const val NAME = "kwik"

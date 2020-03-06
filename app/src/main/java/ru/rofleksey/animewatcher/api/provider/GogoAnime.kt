@@ -6,7 +6,6 @@ import com.google.gson.Gson
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
-import ru.rofleksey.animewatcher.api.AnimeProvider
 import ru.rofleksey.animewatcher.api.model.*
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
