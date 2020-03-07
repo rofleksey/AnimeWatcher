@@ -106,13 +106,13 @@ class KickassAnime(context: Context) : AnimeProvider(context) {
                 gson.fromJson<String>(linkJSON, String::class.java)
             }.filter {
                 it.isNotBlank()
-            }.flatMap {
+            }.map {
                 val url = it.toHttpUrl()
                 val actualLink = url.queryParameter("data")
                 if (actualLink != null) {
-                    sequenceOf(ProviderResult(actualLink, Quality.UNKNOWN))
+                    ProviderResult(actualLink, Quality.UNKNOWN)
                 } else {
-                    sequenceOf()
+                    ProviderResult(it, Quality.UNKNOWN)
                 }
             }.toList()
         })

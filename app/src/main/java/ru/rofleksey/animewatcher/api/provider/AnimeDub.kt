@@ -131,7 +131,7 @@ class AnimeDub(context: Context) : AnimeProvider(context) {
     ): List<ProviderResult> {
         val httpUrl = titleInfo["link"].toHttpUrl()
         val providerIds = titleInfo["providerArray"].split(",")
-        val dubbingIds = titleInfo["providerArray"].split(",")
+        val dubbingIds = titleInfo["dubbingArray"].split(",")
         return providerIds.map { providerId ->
             HttpHandler.instance.executeDirect({
                 HttpUrl.Builder()

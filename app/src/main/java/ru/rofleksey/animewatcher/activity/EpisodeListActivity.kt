@@ -379,8 +379,8 @@ class EpisodeListActivity : AppCompatActivity() {
                 ContextCompat.getColor(
                     this@EpisodeListActivity, when (titleEntry.downloads[item.name]?.state) {
                         null -> R.color.colorWhite
-                        EpisodeDownloadState.REJECTED -> R.color.accent
-                        EpisodeDownloadState.FINISHED -> R.color.primary
+                        EpisodeDownloadState.REJECTED -> R.color.colorAccent
+                        EpisodeDownloadState.FINISHED -> R.color.colorPrimary
                         EpisodeDownloadState.PENDING -> R.color.colorHighlight
                     }
                 )
@@ -424,7 +424,7 @@ class EpisodeListActivity : AppCompatActivity() {
                     titleEntry.downloads[item.name] ?: return@setOnLongClickListener false
                 when (downloadEntry.state) {
                     EpisodeDownloadState.FINISHED -> {
-                        val items = listOf("Play", "Delete")
+                        val items = listOf("Play", "With reaction...", "Delete")
                         MaterialDialog(this@EpisodeListActivity).show {
                             listItems(items = items) { dialog, index, text ->
                                 when (text) {
@@ -436,10 +436,28 @@ class EpisodeListActivity : AppCompatActivity() {
                                             )
                                             return@listItems
                                         }
-                                        AnimeUtils.openDefault(
+                                        AnimeUtils.openVideo(
                                             this@EpisodeListActivity,
                                             downloadEntry.file
                                         )
+                                    }
+                                    "With reaction..." -> {
+                                        if (!File(downloadEntry.file).exists()) {
+                                            AnimeUtils.toast(
+                                                this@EpisodeListActivity,
+                                                "File ${downloadEntry.file} doesn't exist!"
+                                            )
+                                            return@listItems
+                                        }
+                                        val reactionIntent = Intent(
+                                            this@EpisodeListActivity,
+                                            ReactionActivity::class.java
+                                        )
+                                        reactionIntent.putExtra(
+                                            PlayerActivity.ARG_FILE,
+                                            downloadEntry.file
+                                        )
+                                        startActivity(reactionIntent)
                                     }
                                     "Delete" -> {
                                         MaterialDialog(this@EpisodeListActivity).show {

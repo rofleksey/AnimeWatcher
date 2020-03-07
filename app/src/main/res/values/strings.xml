@@ -10,6 +10,7 @@
     <string name="menu_search">Search</string>
     <string name="menu_tools">Tools</string>
     <string name="search_request_here">Search here</string>
+    <string name="ok">ok</string>
 
     <string-array name="providers">
         <item>AnimePahe (cloudflare)</item>

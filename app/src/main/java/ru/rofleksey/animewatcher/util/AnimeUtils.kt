@@ -4,10 +4,12 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.provider.MediaStore
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
@@ -29,11 +31,17 @@ class AnimeUtils {
                 intent.data = Uri.parse(url)
                 context.startActivity(intent)
             } catch (e: ActivityNotFoundException) {
-                openDefault(context, url)
+                openVideo(context, url)
             }
         }
 
-        fun openDefault(context: Context, url: String) {
+        fun open(context: Context, url: String) {
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.data = Uri.parse(url)
+            context.startActivity(intent)
+        }
+
+        fun openVideo(context: Context, url: String) {
             val intent = Intent(Intent.ACTION_VIEW)
             intent.setDataAndType(Uri.parse(url), "video/*")
             context.startActivity(intent)
@@ -82,6 +90,27 @@ class AnimeUtils {
             } else {
                 "${number}p"
             }
+        }
+
+        fun getPickerPath(context: Context, uri: Uri): String? {
+            var filePath: String? = null
+            if ("content" == uri.scheme) {
+                val cursor: Cursor? = context.contentResolver.query(
+                    uri,
+                    arrayOf(MediaStore.Images.ImageColumns.DATA),
+                    null,
+                    null,
+                    null
+                )
+                if (cursor != null) {
+                    cursor.moveToFirst()
+                    filePath = cursor.getString(0)
+                    cursor.close()
+                }
+            } else {
+                filePath = uri.path
+            }
+            return filePath
         }
 
         fun getFileExt(path: String): String {

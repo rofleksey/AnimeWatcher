@@ -30,6 +30,11 @@ class ApiUtil {
             return match.groupValues[1]
         }
 
+        fun getRegexSafe(str: String, regex: Regex): String? {
+            val match = regex.find(str) ?: return null
+            return match.groupValues[1]
+        }
+
         fun getRegexAll(str: String, regex: Regex): Sequence<String> {
             return regex.findAll(str).map {
                 it.groupValues[1]

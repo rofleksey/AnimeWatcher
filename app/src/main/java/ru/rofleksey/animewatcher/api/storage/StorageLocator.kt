@@ -3,6 +3,7 @@ package ru.rofleksey.animewatcher.api.storage
 import android.util.Log
 import ru.rofleksey.animewatcher.api.storage.english.*
 import ru.rofleksey.animewatcher.api.storage.russian.AnimeDubStorage
+import ru.rofleksey.animewatcher.api.storage.russian.HaloAniStorage
 import ru.rofleksey.animewatcher.api.storage.russian.MailRuStorage
 import ru.rofleksey.animewatcher.api.storage.russian.SibnetStorage
 import java.net.URI
@@ -23,6 +24,7 @@ class StorageLocator {
                     "video.sibnet.ru" -> SibnetStorage.instance
                     "animedub.ru" -> AnimeDubStorage.instance
                     "animo-pace-stream.io" -> AnimoPaceStream.instance
+                    "haloani.ru" -> HaloAniStorage.INSTANCE
                     else -> null
                 }
             } catch (e: Exception) {

@@ -6,6 +6,7 @@
     <color name="colorOrange">#FFA500</color>
     <color name="colorBlack">#000000</color>
     <color name="colorWhite">#FFFFFF</color>
+    <color name="colorTransparent">#00000000</color>
     <color name="colorWhiteTransparent">#55FFFFFF</color>
     <color name="colorBackground">#282C38</color>
     <color name="colorBackgroundTransparent">#99282C38</color>

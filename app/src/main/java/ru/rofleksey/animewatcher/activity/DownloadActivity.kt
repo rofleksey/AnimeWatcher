@@ -310,6 +310,7 @@ class DownloadActivity : AppCompatActivity() {
                         downloadData[listIndex].details = "processing..."
                         adapter.notifyItemChanged(listIndex)
 
+                        var prependIndex = 0
                         val result = withContext(Dispatchers.IO) {
                             storage.extract(providerResult)
                         }.sortedBy {
@@ -329,7 +330,7 @@ class DownloadActivity : AppCompatActivity() {
                                         StorageLocator.locate(result.link),
                                         idHolder.next()
                                     )
-                                    queue.addFirst(newEntry)
+                                    queue.add(prependIndex++, newEntry)
                                     listOf(queueEntryToDownloadEntry(newEntry, true))
                                 } else {
                                     listOf()
@@ -359,7 +360,7 @@ class DownloadActivity : AppCompatActivity() {
                         downloadData[listIndex].details = e.message ?: "ERROR"
                         adapter.notifyItemChanged(listIndex)
                     }
-                    delay(250)
+                    delay(400)
                 }
             }
         } catch (e: Exception) {
@@ -454,8 +455,8 @@ class DownloadActivity : AppCompatActivity() {
                     this@DownloadActivity, when (item.entryType) {
                         EntryType.LINK_WITH_STORAGE -> R.color.colorPanel
                         EntryType.PROCESSING -> R.color.colorHighlight
-                        EntryType.ERROR -> R.color.accent
-                        EntryType.READY -> R.color.primary
+                        EntryType.ERROR -> R.color.colorAccent
+                        EntryType.READY -> R.color.colorPrimary
                         EntryType.REDIRECT -> R.color.colorOrange
                         EntryType.INVALID_STORAGE -> R.color.colorBlack
                     }
@@ -468,13 +469,14 @@ class DownloadActivity : AppCompatActivity() {
                     }
                     startingDownload = true
                     download(episodeName, item.storageResult)
-                    title
                     finish()
+                } else if (item.entryType == EntryType.ERROR || item.entryType == EntryType.INVALID_STORAGE) {
+                    AnimeUtils.open(this@DownloadActivity, item.sourceLink)
                 }
             }
             holder.view.setOnLongClickListener {
                 if (item.storageResult != null) {
-                    AnimeUtils.openDefault(this@DownloadActivity, item.storageResult.link)
+                    AnimeUtils.openVideo(this@DownloadActivity, item.storageResult.link)
                     return@setOnLongClickListener true
                 }
                 return@setOnLongClickListener false
