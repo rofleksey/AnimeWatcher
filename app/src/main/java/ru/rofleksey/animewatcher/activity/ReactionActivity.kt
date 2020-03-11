@@ -144,12 +144,13 @@ class ReactionActivity : AppCompatActivity() {
             val (x, y) = getPosition()
             process(
                 arrayOf(
+                    "-hide_banner",
                     "-ss", reactionStart, "-i", reactionFile!!,
                     "-ss", episodeStart, "-i", episodeFile,
                     "-y", "-threads", (2 * Runtime.getRuntime().availableProcessors()).toString(),
                     "-filter_complex",
                     "[0:v]setpts=PTS-STARTPTS[reaction];[1:v]setpts=PTS-STARTPTS,scale=iw*${episodeScale}:ih*${episodeScale}[episode];" +
-                            "[reaction][episode]overlay=x=${x}:y=${y}:eof_action=pass;[0:a]volume=volume=${reactorVolume}[rsound];[1:a]volume=volume=${1 - reactorVolume}[esound];[rsound][esound]amix=inputs=2[a]",
+                            "[reaction][episode]overlay=shortest=1:x=${x}:y=${y}:eof_action=endall;[0:a]volume=volume=${2 * reactorVolume}[rsound];[1:a]volume=volume=${2 * (1 - reactorVolume)}[esound];[rsound][esound]amix=duration=shortest:inputs=2[a]",
                     "-map", "[a]", "-shortest",
                     "-f", "mp4", "-acodec", "aac",
                     "-vcodec", "libx264", "-crf", "18", "-preset", "ultrafast",
@@ -170,12 +171,13 @@ class ReactionActivity : AppCompatActivity() {
             ).toString()
             process(
                 arrayOf(
+                    "-hide_banner",
                     "-ss", reactionStart, "-i", reactionFile!!,
                     "-ss", episodeStart, "-i", episodeFile,
                     "-y", "-threads", (2 * Runtime.getRuntime().availableProcessors()).toString(),
                     "-filter_complex",
                     "[0:v]setpts=PTS-STARTPTS[reaction];[1:v]setpts=PTS-STARTPTS,scale=iw*${episodeScale}:ih*${episodeScale}[episode];" +
-                            "[reaction][episode]overlay=x=${x}:y=${y}:eof_action=pass;[0:a]volume=volume=${reactorVolume}[rsound];[1:a]volume=volume=${1 - reactorVolume}[esound];[rsound][esound]amix=inputs=2[a]",
+                            "[reaction][episode]overlay=shortest=1:x=${x}:y=${y}:eof_action=pass;[0:a]volume=volume=${2 * reactorVolume}[rsound];[1:a]volume=volume=${2 * (1 - reactorVolume)}[esound];[rsound][esound]amix=duration=shortest:inputs=2[a]",
                     "-map", "[a]", "-shortest",
                     "-f", "mp4", "-acodec", "aac",
                     "-vcodec", "libx264", "-crf", "18", "-preset", "fast",
@@ -315,6 +317,9 @@ class ReactionActivity : AppCompatActivity() {
             val intent = Intent(this, FfmpegService::class.java)
             intent.putExtra(FfmpegService.ARG_ARGUMENTS, arguments)
             startService(intent)
+            AnimeUtils.vibrate(this@ReactionActivity, 20)
+            AnimeUtils.toast(this@ReactionActivity, "Processing in the background")
+            finish()
         }
     }
 
@@ -322,7 +327,7 @@ class ReactionActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SELECT_REACTION && resultCode == RESULT_OK && data != null) {
             val payload = data.data ?: return
-            setReactionFile(AnimeUtils.getPickerPath(this, payload))
+            setReactionFile(AnimeUtils.getFileFromIntentData(this, payload))
         }
     }
 }

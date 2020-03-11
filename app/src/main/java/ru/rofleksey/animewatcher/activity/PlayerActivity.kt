@@ -1,7 +1,12 @@
 package ru.rofleksey.animewatcher.activity
 
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -31,6 +36,7 @@ import kotlinx.android.synthetic.main.activity_player.*
 import kotlinx.coroutines.*
 import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler
 import nl.bravobit.ffmpeg.FFmpeg
+import nl.bravobit.ffmpeg.FFtask
 import ru.rofleksey.animewatcher.R
 import ru.rofleksey.animewatcher.util.AnimeUtils
 import java.io.File
@@ -60,27 +66,34 @@ class PlayerActivity : AppCompatActivity(),
         const val LOADING_ANIMATION_TIME = 450L
         const val HIDE_CONTROLS_TIME = 3500L
         const val SEEK_BAR_UPDATE_INTERVAL = 100L
+        const val SEEK_GO_BACK_ON_RESUME_TIME = 5000L
+        const val PLAYBACK_SLOW_SPEED = 0.33f
+        const val PLAYBACK_SLOW_PITCH = 0.75f
+        const val PLAYBACK_FAST_SPEED = 3f
+        const val PLAYBACK_FAST_PITCH = 1.25f
     }
 
     private lateinit var filePath: String
     private lateinit var gestureDetector: GestureDetectorCompat
     private lateinit var exoPlayer: SimpleExoPlayer
+    private lateinit var becomingNoisyReceiver: BecomingNoisyReceiver
 
     private val handler = Handler()
 
     private var stopPosition: Long = 0
     private var seekStartPosition: Long = 0
-    private var scrolling: Boolean = false
+    private var scrolling = false
     private val seekDistanceCounter = SeekDistanceCounter(0f, 0f)
-    private var shouldExecuteOnResume: Boolean = false
+    private var shouldExecuteOnResume = false
 
     private var gifStartPosition: Long = -1
     private var gifEndPosition: Long = -1
-    private var controlsOpen: Boolean = false
+    private var controlsOpen = false
 
-    private var seekProcessing: Boolean = false
-    private var draggingSeekBar: Boolean = false
+    private var seekProcessing = false
+    private var draggingSeekBar = false
     private var seekAnimation: YoYo.YoYoString? = null
+    private var alteredSpeedPlayback = false
 
     private var job: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
@@ -104,33 +117,54 @@ class PlayerActivity : AppCompatActivity(),
         }
     }
 
+    private inner class BecomingNoisyReceiver : BroadcastReceiver() {
+
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                if (exoPlayer.isPlaying) {
+                    togglePlay()
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(FEATURE_NO_TITLE)
         window.addFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
         supportActionBar?.hide()
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         setContentView(R.layout.activity_player)
 
-        filePath = intent.getStringExtra(ARG_FILE) ?: ""
+        filePath =
+            intent.getStringExtra(ARG_FILE) ?: AnimeUtils.getFileFromIntentData(this, intent.data)
+                    ?: intent.data?.toString() ?: ""
+        Log.v(TAG, "file = $filePath")
         gestureDetector = GestureDetectorCompat(this, this)
+        becomingNoisyReceiver = BecomingNoisyReceiver()
 
         surface_view.setOnTouchListener { _, event ->
             if (gestureDetector.onTouchEvent(event)) {
                 return@setOnTouchListener true
             }
-            if (event.action == MotionEvent.ACTION_UP && scrolling) {
-                Log.v(TAG, "scroll end")
-                val seekValue = seekDistanceCounter.seekValue()
-                seek_text.visibility = View.GONE
-                val newPos = max(0f, (exoPlayer.currentPosition + seekValue)).toLong()
-                if (newPos != exoPlayer.currentPosition) {
-                    exoPlayer.seekTo(newPos)
+            if (event.action == MotionEvent.ACTION_UP) {
+                Log.v(TAG, "touch end")
+                if (scrolling) {
+                    val seekValue = seekDistanceCounter.seekValue()
+                    seek_text.visibility = View.GONE
+                    val newPos = max(0f, (exoPlayer.currentPosition + seekValue)).toLong()
+                    if (newPos != exoPlayer.currentPosition) {
+                        exoPlayer.seekTo(newPos)
+                    }
+                    scrolling = false
+                    seekDistanceCounter.reset()
                 }
-                scrolling = false
-                seekDistanceCounter.reset()
+                if (alteredSpeedPlayback) {
+                    alteredSpeedPlayback = false
+                    exoPlayer.setPlaybackParameters(PlaybackParameters(1f))
+                }
             }
             false
         }
@@ -257,6 +291,7 @@ class PlayerActivity : AppCompatActivity(),
                 seekProcessing = true
             }
 
+            @SuppressLint("SwitchIntDef")
             override fun onPlayerStateChanged(
                 eventTime: AnalyticsListener.EventTime,
                 playWhenReady: Boolean,
@@ -265,22 +300,27 @@ class PlayerActivity : AppCompatActivity(),
                 if (playbackState != Player.STATE_IDLE && playbackState != Player.STATE_ENDED) {
                     updateProgress()
                 }
-                if (playbackState == Player.STATE_READY) {
-                    updateAspectRatio()
-                    if (seekProcessing) {
-                        seekProcessing = false
-                        if (seek_loading.visibility == View.VISIBLE) {
-                            handler.post {
-                                seekAnimation?.stop()
-                                seekAnimation = YoYo
-                                    .with(Techniques.FadeOut)
-                                    .onEnd {
-                                        seek_loading.visibility = View.GONE
-                                    }
-                                    .duration(SEEK_ANIMATION_TIME)
-                                    .playOn(seek_loading)
+                when (playbackState) {
+                    Player.STATE_READY -> {
+                        updateAspectRatio()
+                        if (seekProcessing) {
+                            seekProcessing = false
+                            if (seek_loading.visibility == View.VISIBLE) {
+                                handler.post {
+                                    seekAnimation?.stop()
+                                    seekAnimation = YoYo
+                                        .with(Techniques.FadeOut)
+                                        .onEnd {
+                                            seek_loading.visibility = View.GONE
+                                        }
+                                        .duration(SEEK_ANIMATION_TIME)
+                                        .playOn(seek_loading)
+                                }
                             }
                         }
+                    }
+                    Player.STATE_ENDED -> {
+                        finish()
                     }
                 }
             }
@@ -309,10 +349,16 @@ class PlayerActivity : AppCompatActivity(),
     override fun onStart() {
         Log.v(TAG, "lifecycle: onStart")
         super.onStart()
+        registerReceiver(
+            becomingNoisyReceiver,
+            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+        )
         initPlayer()
-        if (stopPosition != 0L) {
-            exoPlayer.seekTo(stopPosition)
+        val resumePos = max(0, stopPosition - SEEK_GO_BACK_ON_RESUME_TIME)
+        if (resumePos > 0) {
+            exoPlayer.seekTo(resumePos)
         }
+        exoPlayer.setPlaybackParameters(PlaybackParameters(1f))
     }
 
     override fun onResume() {
@@ -323,7 +369,6 @@ class PlayerActivity : AppCompatActivity(),
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
         showControls(true)
-        shouldExecuteOnResume = true
         exoPlayer.playWhenReady = true
         button_play.speed = -PLAY_BUTTON_ANIMATION_SPEED
         button_play.playAnimation()
@@ -335,6 +380,7 @@ class PlayerActivity : AppCompatActivity(),
         exoPlayer.stop()
         seekProcessing = false
         draggingSeekBar = false
+        alteredSpeedPlayback = false
 
         seek_loading.visibility = View.GONE
         seek_text.visibility = View.GONE
@@ -354,6 +400,7 @@ class PlayerActivity : AppCompatActivity(),
         Log.v(TAG, "lifecycle: onStop")
         super.onStop()
         exoPlayer.release()
+        unregisterReceiver(becomingNoisyReceiver)
         handler.removeCallbacks(updateProgressRunnable)
         handler.removeCallbacks(closeControlsRunnable)
     }
@@ -407,7 +454,7 @@ class PlayerActivity : AppCompatActivity(),
                 func(app)
             } catch (e: Exception) {
                 e.printStackTrace()
-                AnimeUtils.toast(this@PlayerActivity, "error: ${e.message}")
+                AnimeUtils.toast(this@PlayerActivity, "error")
             } finally {
                 animation.stop()
                 YoYo
@@ -434,6 +481,8 @@ class PlayerActivity : AppCompatActivity(),
             val result = suspendCancellableCoroutine<String> { cont ->
                 val task = app.execute(
                     arrayOf(
+                        "-y", "-hide_banner",
+                        "-threads", Runtime.getRuntime().availableProcessors().toString(),
                         "-ss",
                         (curPos / 1000f).toString(),
                         "-i",
@@ -491,44 +540,82 @@ class PlayerActivity : AppCompatActivity(),
             val outputFileName = "${File(filePath).name}_${Random.nextLong()}.${ext}"
             Log.v(TAG, "FFmpeg processing started!")
             val result = suspendCancellableCoroutine<String> { cont ->
-                val task = app.execute(
-                    when (ext) {
-                        "gif" -> {
-                            arrayOf(
-                                "-ss",
-                                startSeconds.toString(),
-                                "-i",
-                                inputPath,
-                                "-t",
-                                duration.toString(),
-                                "-loop",
-                                "0",
-                                "-vf",
-                                "fps=20,scale=640:-1",
-                                File(
-                                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                                    outputFileName
-                                ).toString()
-                            )
+                var task: FFtask?
+                if (ext == "gif") {
+                    val palette = File(
+                        Environment.getExternalStoragePublicDirectory(
+                            Environment.DIRECTORY_PICTURES
+                        ),
+                        "_palette.png"
+                    ).toString()
+                    task = app.execute(
+                        arrayOf(
+                            "-y", "-hide_banner",
+                            "-threads", (2 * Runtime.getRuntime().availableProcessors()).toString(),
+                            "-ss",
+                            startSeconds.toString(),
+                            "-t",
+                            duration.toString(),
+                            "-i",
+                            inputPath,
+                            "-vf",
+                            "scale=640:-1:flags=lanczos,palettegen", palette
+                        ), object :
+                            ExecuteBinaryResponseHandler() {
+                            override fun onFailure(message: String) {
+                                cont.resumeWithException(Exception(message))
+                            }
+
+                            override fun onSuccess(message: String) {
+                                Log.v(TAG, "Palette created, generating gif...")
+                                task = app.execute(
+                                    arrayOf(
+                                        "-y",
+                                        "-hide_banner",
+                                        "-threads",
+                                        (2 * Runtime.getRuntime().availableProcessors()).toString(),
+                                        "-ss",
+                                        startSeconds.toString(),
+                                        "-t",
+                                        duration.toString(),
+                                        "-i",
+                                        inputPath,
+                                        "-i",
+                                        palette,
+                                        "-loop",
+                                        "0",
+                                        "-filter_complex",
+                                        "scale=400:-1:flags=lanczos[x];[x][1:v]paletteuse",
+                                        File(
+                                            Environment.getExternalStoragePublicDirectory(
+                                                Environment.DIRECTORY_PICTURES
+                                            ),
+                                            outputFileName
+                                        ).toString()
+                                    ), object :
+                                        ExecuteBinaryResponseHandler() {
+                                        override fun onFailure(message: String) {
+                                            File(palette).delete()
+                                            cont.resumeWithException(Exception(message))
+                                        }
+
+                                        override fun onSuccess(message: String) {
+                                            File(palette).delete()
+                                            cont.resume(message)
+                                        }
+                                    })
+                            }
                         }
-                        "mp4" -> {
-                            if (AnimeUtils.getFileExt(inputPath).toLowerCase() == "mp4") {
+                    )
+                } else {
+                    task = app.execute(
+                        when (ext) {
+                            "mp4" -> {
                                 arrayOf(
-                                    "-ss",
-                                    startSeconds.toString(),
-                                    "-i",
-                                    inputPath,
-                                    "-t",
-                                    duration.toString(),
-                                    "-c",
-                                    "copy",
-                                    File(
-                                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-                                        outputFileName
-                                    ).toString()
-                                )
-                            } else {
-                                arrayOf(
+                                    "-y",
+                                    "-hide_banner",
+                                    "-threads",
+                                    (2 * Runtime.getRuntime().availableProcessors()).toString(),
                                     "-ss",
                                     startSeconds.toString(),
                                     "-i",
@@ -541,34 +628,38 @@ class PlayerActivity : AppCompatActivity(),
                                     ).toString()
                                 )
                             }
-                        }
-                        "mp3" -> {
-                            arrayOf(
-                                "-ss",
-                                startSeconds.toString(),
-                                "-i",
-                                inputPath,
-                                "-t",
-                                duration.toString(),
-                                File(
-                                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
-                                    outputFileName
-                                ).toString()
-                            )
-                        }
-                        else -> arrayOf("--wtf")
-                    }, object :
-                        ExecuteBinaryResponseHandler() {
-                        override fun onFailure(message: String) {
-                            cont.resumeWithException(Exception(message))
-                        }
+                            "mp3" -> {
+                                arrayOf(
+                                    "-y",
+                                    "-hide_banner",
+                                    "-threads",
+                                    (2 * Runtime.getRuntime().availableProcessors()).toString(),
+                                    "-ss",
+                                    startSeconds.toString(),
+                                    "-i",
+                                    inputPath,
+                                    "-t",
+                                    duration.toString(),
+                                    File(
+                                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+                                        outputFileName
+                                    ).toString()
+                                )
+                            }
+                            else -> arrayOf("--wtf")
+                        }, object :
+                            ExecuteBinaryResponseHandler() {
+                            override fun onFailure(message: String) {
+                                cont.resumeWithException(Exception(message))
+                            }
 
-                        override fun onSuccess(message: String) {
-                            cont.resume(message)
-                        }
-                    })
+                            override fun onSuccess(message: String) {
+                                cont.resume(message)
+                            }
+                        })
+                }
                 cont.invokeOnCancellation {
-                    task.sendQuitSignal()
+                    task?.sendQuitSignal()
                 }
             }
             Log.v(TAG, "result = $result")
@@ -642,8 +733,30 @@ class PlayerActivity : AppCompatActivity(),
         return true
     }
 
-    override fun onLongPress(e: MotionEvent?) {
+    override fun onLongPress(e: MotionEvent) {
         Log.v(TAG, "onLongPress")
+        if (exoPlayer.isPlaying) {
+            when {
+                e.x < surface_view.width / 4 -> {
+                    alteredSpeedPlayback = true
+                    exoPlayer.setPlaybackParameters(
+                        PlaybackParameters(
+                            PLAYBACK_SLOW_SPEED,
+                            PLAYBACK_SLOW_PITCH
+                        )
+                    )
+                }
+                e.x > surface_view.width / 4 -> {
+                    alteredSpeedPlayback = true
+                    exoPlayer.setPlaybackParameters(
+                        PlaybackParameters(
+                            PLAYBACK_FAST_SPEED,
+                            PLAYBACK_FAST_PITCH
+                        )
+                    )
+                }
+            }
+        }
     }
 
     private var frameIntervalVar: Long = 0

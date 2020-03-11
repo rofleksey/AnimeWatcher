@@ -83,6 +83,8 @@ class FfmpegService : Service() {
             channelId
         ) else Notification.Builder(this)
         return builder
+            .setOngoing(true)
+            .setProgress(0, 100, true)
             .setSmallIcon(R.drawable.zero2)
             .setContentTitle(title)
             .setOnlyAlertOnce(true)

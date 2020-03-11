@@ -24,7 +24,23 @@
         <activity android:name=".activity.ReactionActivity" />
         <activity
             android:name=".activity.PlayerActivity"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="landscape">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:host="*" />
+
+                <data
+                    android:mimeType="video/*"
+                    android:scheme="file" />
+                <data
+                    android:mimeType="video/*"
+                    android:scheme="content" />
+            </intent-filter>
+        </activity>
         <activity android:name=".activity.SecretActivity" />
         <activity android:name=".activity.DownloadActivity" />
         <activity

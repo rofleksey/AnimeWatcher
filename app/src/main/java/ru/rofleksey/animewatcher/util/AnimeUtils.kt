@@ -92,7 +92,10 @@ class AnimeUtils {
             }
         }
 
-        fun getPickerPath(context: Context, uri: Uri): String? {
+        fun getFileFromIntentData(context: Context, uri: Uri?): String? {
+            if (uri == null) {
+                return null
+            }
             var filePath: String? = null
             if ("content" == uri.scheme) {
                 val cursor: Cursor? = context.contentResolver.query(

@@ -29,6 +29,7 @@ import com.google.android.material.snackbar.Snackbar
 import jp.wasabeef.glide.transformations.BlurTransformation
 import jp.wasabeef.glide.transformations.gpu.PixelationFilterTransformation
 import jp.wasabeef.recyclerview.animators.LandingAnimator
+import kotlinx.android.synthetic.main.activity_episode_list.*
 import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.R
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
@@ -184,7 +185,12 @@ class EpisodeListActivity : AppCompatActivity() {
 
         snackbar = Snackbar.make(refreshLayout, "Refreshing...", Snackbar.LENGTH_INDEFINITE)
             .also { it.show() }
-        snackbar?.setBackgroundTint(resources.getColor(R.color.colorPanel))
+        snackbar?.setBackgroundTint(
+            ContextCompat.getColor(
+                this,
+                R.color.colorPanel
+            )
+        )
 
         Glide
             .with(this)
@@ -247,6 +253,18 @@ class EpisodeListActivity : AppCompatActivity() {
                 updateDownloadState()
             } catch (e: Exception) {
                 e.printStackTrace()
+                snackbar =
+                    Snackbar.make(
+                        activity_episode_list_root,
+                        e.message ?: "ERROR",
+                        Snackbar.LENGTH_INDEFINITE
+                    ).apply { show() }
+                snackbar?.setBackgroundTint(
+                    ContextCompat.getColor(
+                        this@EpisodeListActivity,
+                        R.color.colorAccent
+                    )
+                )
             } finally {
 
             }

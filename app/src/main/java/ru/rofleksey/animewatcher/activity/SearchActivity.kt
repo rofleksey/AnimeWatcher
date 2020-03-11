@@ -19,6 +19,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -30,8 +31,10 @@ import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.daimajia.androidanimations.library.Techniques
 import com.daimajia.androidanimations.library.YoYo
 import com.github.ybq.android.spinkit.SpinKitView
+import com.google.android.material.snackbar.Snackbar
 import com.mikepenz.iconics.view.IconicsImageButton
 import jp.wasabeef.recyclerview.animators.FadeInAnimator
+import kotlinx.android.synthetic.main.activity_search.*
 import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.R
 import ru.rofleksey.animewatcher.api.model.TitleInfo
@@ -77,6 +80,8 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var titleStorage: TitleStorage
     private lateinit var provider: AnimeProvider
     private lateinit var providerName: String
+
+    private var snackbar: Snackbar? = null
 
     private val titleData = ArrayList<TitleInfo>()
     private val searchDebounces = Debounce(SEARCH_DELAY)
@@ -294,6 +299,18 @@ class SearchActivity : AppCompatActivity() {
                 diff.dispatchUpdatesTo(adapter)
             } catch (e: Exception) {
                 e.printStackTrace()
+                snackbar =
+                    Snackbar.make(
+                        search_activity_root,
+                        e.message ?: "ERROR",
+                        Snackbar.LENGTH_SHORT
+                    ).apply { show() }
+                snackbar?.setBackgroundTint(
+                    ContextCompat.getColor(
+                        this@SearchActivity,
+                        R.color.colorAccent
+                    )
+                )
             } finally {
                 loadingView.visibility = View.INVISIBLE
                 toggleBackground(true)

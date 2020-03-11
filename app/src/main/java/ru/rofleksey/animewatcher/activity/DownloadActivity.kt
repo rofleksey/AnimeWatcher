@@ -371,7 +371,7 @@ class DownloadActivity : AppCompatActivity() {
             snackbar?.setBackgroundTint(
                 ContextCompat.getColor(
                     this,
-                    R.color.colorPanel
+                    R.color.colorAccent
                 )
             )
         } finally {
