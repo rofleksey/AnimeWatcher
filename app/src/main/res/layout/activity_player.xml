@@ -8,7 +8,7 @@
     tools:context=".activity.PlayerActivity">
 
     <ru.rofleksey.animewatcher.ui.AspectRatioFrameLayout
-        android:id="@+id/aspect_ration_frame_layout"
+        android:id="@+id/aspect_ratio_video_frame_layout"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -17,7 +17,7 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <SurfaceView
-            android:id="@+id/surface_view"
+            android:id="@+id/surface_view_video"
             android:keepScreenOn="true"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -26,6 +26,7 @@
 
     </ru.rofleksey.animewatcher.ui.AspectRatioFrameLayout>
 
+
     <!-- prevent annoying propagation by setting clickable = true-->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/controls"
@@ -33,7 +34,7 @@
         android:layout_height="wrap_content"
         android:alpha="0"
         android:background="@color/colorBackgroundTransparent"
-        android:elevation="2dp"
+        android:elevation="3dp"
         android:visibility="gone"
         android:layout_marginBottom="5dp"
         android:clickable="true"
@@ -152,7 +153,7 @@
         android:alpha="0"
         android:background="@color/colorWhiteTransparent"
         android:clickable="false"
-        android:elevation="3dp"
+        android:elevation="4dp"
         android:focusable="false"
         android:longClickable="false"
         android:visibility="gone"
@@ -172,7 +173,7 @@
         android:layout_height="wrap_content"
         android:background="@color/colorBackgroundTransparent"
         android:clickable="false"
-        android:elevation="4dp"
+        android:elevation="5dp"
         android:focusable="false"
         android:fontFamily="monospace"
         android:longClickable="false"
@@ -194,7 +195,7 @@
         android:layout_gravity="center"
         android:alpha="0"
         android:background="@color/colorBackgroundTransparent"
-        android:elevation="5dp"
+        android:elevation="6dp"
         android:visibility="gone"
         app:SpinKit_Color="@color/colorWhite"
         app:layout_constrainedHeight="true"

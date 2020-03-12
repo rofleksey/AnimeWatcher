@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ActivityInfo
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.SoundPool
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -71,12 +73,14 @@ class PlayerActivity : AppCompatActivity(),
         const val PLAYBACK_SLOW_PITCH = 0.75f
         const val PLAYBACK_FAST_SPEED = 3f
         const val PLAYBACK_FAST_PITCH = 1.25f
+        const val REWIND_SPEED = 100L
     }
 
     private lateinit var filePath: String
     private lateinit var gestureDetector: GestureDetectorCompat
     private lateinit var exoPlayer: SimpleExoPlayer
     private lateinit var becomingNoisyReceiver: BecomingNoisyReceiver
+    private lateinit var audioManager: AudioManager
 
     private val handler = Handler()
 
@@ -84,7 +88,14 @@ class PlayerActivity : AppCompatActivity(),
     private var seekStartPosition: Long = 0
     private var scrolling = false
     private val seekDistanceCounter = SeekDistanceCounter(0f, 0f)
-    private var shouldExecuteOnResume = false
+
+    private var soundPool: SoundPool? = null
+    private var rewindStartSound: Int = -1
+    private var rewindStopSound: Int = -1
+    private var rewindLoopSound: Int = -1
+    private var rewindStartStream: Int? = null
+    private var rewindStopStream: Int? = null
+    private var rewindLoopStream: Int? = null
 
     private var gifStartPosition: Long = -1
     private var gifEndPosition: Long = -1
@@ -94,6 +105,7 @@ class PlayerActivity : AppCompatActivity(),
     private var draggingSeekBar = false
     private var seekAnimation: YoYo.YoYoString? = null
     private var alteredSpeedPlayback = false
+    private var rewinding = false
 
     private var job: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
@@ -137,6 +149,7 @@ class PlayerActivity : AppCompatActivity(),
         supportActionBar?.hide()
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         setContentView(R.layout.activity_player)
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
         filePath =
             intent.getStringExtra(ARG_FILE) ?: AnimeUtils.getFileFromIntentData(this, intent.data)
@@ -145,7 +158,7 @@ class PlayerActivity : AppCompatActivity(),
         gestureDetector = GestureDetectorCompat(this, this)
         becomingNoisyReceiver = BecomingNoisyReceiver()
 
-        surface_view.setOnTouchListener { _, event ->
+        surface_view_video.setOnTouchListener { _, event ->
             if (gestureDetector.onTouchEvent(event)) {
                 return@setOnTouchListener true
             }
@@ -154,10 +167,7 @@ class PlayerActivity : AppCompatActivity(),
                 if (scrolling) {
                     val seekValue = seekDistanceCounter.seekValue()
                     seek_text.visibility = View.GONE
-                    val newPos = max(0f, (exoPlayer.currentPosition + seekValue)).toLong()
-                    if (newPos != exoPlayer.currentPosition) {
-                        exoPlayer.seekTo(newPos)
-                    }
+                    seekImpl((exoPlayer.currentPosition + seekValue).toLong())
                     scrolling = false
                     seekDistanceCounter.reset()
                 }
@@ -165,10 +175,19 @@ class PlayerActivity : AppCompatActivity(),
                     alteredSpeedPlayback = false
                     exoPlayer.setPlaybackParameters(PlaybackParameters(1f))
                 }
+                if (rewinding) {
+                    rewinding = false
+                    rewindStopStream = soundPool?.play(rewindStopSound, 0.2f, 0.4f, 0, 0, 1f)
+                    soundPool?.stop(rewindStartStream ?: 0)
+                    soundPool?.stop(rewindLoopStream ?: 0)
+                    if (!exoPlayer.isPlaying) {
+                        togglePlay()
+                    }
+                }
             }
             false
         }
-        surface_view.setOnSystemUiVisibilityChangeListener { visibility ->
+        surface_view_video.setOnSystemUiVisibilityChangeListener { visibility ->
             if (visibility and View.SYSTEM_UI_FLAG_FULLSCREEN == 0) {
                 showControls(true)
             }
@@ -234,10 +253,7 @@ class PlayerActivity : AppCompatActivity(),
         seek_bar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (draggingSeekBar) {
-                    val dragTime = progress.toLong()
-                    if (dragTime != exoPlayer.currentPosition) {
-                        exoPlayer.seekTo(dragTime)
-                    }
+                    seekImpl(progress.toLong())
                     showControls(true)
                 }
             }
@@ -262,7 +278,7 @@ class PlayerActivity : AppCompatActivity(),
             .setBufferDurationsMs(
                 60 * 1000,
                 5 * 60 * 1000,
-                5000,
+                500,
                 2000
             )
             .setTargetBufferBytes(DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES)
@@ -272,20 +288,22 @@ class PlayerActivity : AppCompatActivity(),
         exoPlayer = SimpleExoPlayer.Builder(this)
             .setLoadControl(loadControl)
             .build()
-        exoPlayer.setVideoSurfaceView(surface_view)
+        exoPlayer.setVideoSurfaceView(surface_view_video)
         exoPlayer.addAnalyticsListener(object : AnalyticsListener {
             override fun onSeekStarted(eventTime: AnalyticsListener.EventTime) {
                 Log.v(TAG, "onSeekStarted")
                 if (!seekProcessing && !exoPlayer.isPlaying) {
                     handler.post {
-                        seekAnimation?.stop()
-                        seekAnimation = YoYo
-                            .with(Techniques.FadeIn)
-                            .onStart {
-                                seek_loading.visibility = View.VISIBLE
-                            }
-                            .duration(SEEK_ANIMATION_TIME)
-                            .playOn(seek_loading)
+                        if (seek_loading.visibility != View.VISIBLE) {
+                            seekAnimation?.stop()
+                            seekAnimation = YoYo
+                                .with(Techniques.FadeIn)
+                                .onStart {
+                                    seek_loading.visibility = View.VISIBLE
+                                }
+                                .duration(SEEK_ANIMATION_TIME)
+                                .playOn(seek_loading)
+                        }
                     }
                 }
                 seekProcessing = true
@@ -305,7 +323,7 @@ class PlayerActivity : AppCompatActivity(),
                         updateAspectRatio()
                         if (seekProcessing) {
                             seekProcessing = false
-                            if (seek_loading.visibility == View.VISIBLE) {
+                            if (seek_loading.visibility == View.VISIBLE && (!rewinding || exoPlayer.currentPosition == 0L)) {
                                 handler.post {
                                     seekAnimation?.stop()
                                     seekAnimation = YoYo
@@ -317,6 +335,10 @@ class PlayerActivity : AppCompatActivity(),
                                         .playOn(seek_loading)
                                 }
                             }
+                        }
+                        if (rewinding) {
+                            showControls(true)
+                            seekImpl(exoPlayer.currentPosition - REWIND_SPEED)
                         }
                     }
                     Player.STATE_ENDED -> {
@@ -330,7 +352,6 @@ class PlayerActivity : AppCompatActivity(),
             this,
             Util.getUserAgent(this, "ru.rofleksey.animewatcher")
         )
-        exoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
         exoPlayer.prepare(
             ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(Uri.parse(filePath))
@@ -342,7 +363,14 @@ class PlayerActivity : AppCompatActivity(),
     private fun updateAspectRatio() {
         val format = exoPlayer.videoFormat
         if (format != null) {
-            aspect_ration_frame_layout.setAspectRatio(format.width.toFloat() / format.height)
+            aspect_ratio_video_frame_layout.setAspectRatio(format.width.toFloat() / format.height)
+        }
+    }
+
+    private fun seekImpl(to: Long) {
+        val newPos = max(0, to)
+        if (newPos != exoPlayer.currentPosition) {
+            exoPlayer.seekTo(newPos)
         }
     }
 
@@ -353,12 +381,18 @@ class PlayerActivity : AppCompatActivity(),
             becomingNoisyReceiver,
             IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
         )
-        initPlayer()
-        val resumePos = max(0, stopPosition - SEEK_GO_BACK_ON_RESUME_TIME)
-        if (resumePos > 0) {
-            exoPlayer.seekTo(resumePos)
+        soundPool = SoundPool.Builder().run {
+            setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).build())
+            setMaxStreams(2)
+            build()
         }
+        rewindStartSound = soundPool!!.load(this, R.raw.rewind_start, 1)
+        rewindStopSound = soundPool!!.load(this, R.raw.rewind_stop, 1)
+        rewindLoopSound = soundPool!!.load(this, R.raw.rewind_loop, 1)
+        initPlayer()
+        exoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
         exoPlayer.setPlaybackParameters(PlaybackParameters(1f))
+        seekImpl(stopPosition - SEEK_GO_BACK_ON_RESUME_TIME)
     }
 
     override fun onResume() {
@@ -369,9 +403,9 @@ class PlayerActivity : AppCompatActivity(),
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
         showControls(true)
-        exoPlayer.playWhenReady = true
-        button_play.speed = -PLAY_BUTTON_ANIMATION_SPEED
-        button_play.playAnimation()
+        if (!exoPlayer.isPlaying) {
+            togglePlay()
+        }
     }
 
     override fun onPause() {
@@ -381,7 +415,8 @@ class PlayerActivity : AppCompatActivity(),
         seekProcessing = false
         draggingSeekBar = false
         alteredSpeedPlayback = false
-
+        rewinding = false
+        soundPool?.autoPause()
         seek_loading.visibility = View.GONE
         seek_text.visibility = View.GONE
         seekDistanceCounter.reset()
@@ -400,7 +435,9 @@ class PlayerActivity : AppCompatActivity(),
         Log.v(TAG, "lifecycle: onStop")
         super.onStop()
         exoPlayer.release()
+        job?.cancel()
         unregisterReceiver(becomingNoisyReceiver)
+        soundPool?.release()
         handler.removeCallbacks(updateProgressRunnable)
         handler.removeCallbacks(closeControlsRunnable)
     }
@@ -408,8 +445,6 @@ class PlayerActivity : AppCompatActivity(),
     override fun onDestroy() {
         Log.v(TAG, "lifecycle: onDestroy")
         super.onDestroy()
-        exoPlayer.release()
-        job?.cancel()
     }
 
     override fun onShowPress(e: MotionEvent?) {
@@ -737,21 +772,30 @@ class PlayerActivity : AppCompatActivity(),
         Log.v(TAG, "onLongPress")
         if (exoPlayer.isPlaying) {
             when {
-                e.x < surface_view.width / 4 -> {
-                    alteredSpeedPlayback = true
-                    exoPlayer.setPlaybackParameters(
-                        PlaybackParameters(
-                            PLAYBACK_SLOW_SPEED,
-                            PLAYBACK_SLOW_PITCH
-                        )
-                    )
+                e.x < surface_view_video.width / 4 -> {
+                    rewinding = true
+                    togglePlay()
+                    exoPlayer.setSeekParameters(SeekParameters.PREVIOUS_SYNC)
+                    seekImpl(exoPlayer.currentPosition - REWIND_SPEED)
+                    soundPool?.stop(rewindStopStream ?: 0)
+                    rewindStartStream = soundPool?.play(rewindStartSound, 0.4f, 0.2f, 0, 0, 1f)
+                    rewindLoopStream = soundPool?.play(rewindLoopSound, 0.6f, 0.6f, 0, -1, 1f)
                 }
-                e.x > surface_view.width / 4 -> {
+                e.x > 3 * surface_view_video.width / 4 -> {
                     alteredSpeedPlayback = true
                     exoPlayer.setPlaybackParameters(
                         PlaybackParameters(
                             PLAYBACK_FAST_SPEED,
                             PLAYBACK_FAST_PITCH
+                        )
+                    )
+                }
+                else -> {
+                    alteredSpeedPlayback = true
+                    exoPlayer.setPlaybackParameters(
+                        PlaybackParameters(
+                            PLAYBACK_SLOW_SPEED,
+                            PLAYBACK_SLOW_PITCH
                         )
                     )
                 }
@@ -775,14 +819,11 @@ class PlayerActivity : AppCompatActivity(),
     override fun onDoubleTap(e: MotionEvent): Boolean {
         val seekTime = if (exoPlayer.isPlaying) FAST_SEEK_TIME_FAR else getFrameInterval()
         when {
-            e.x < surface_view.width / 4 -> {
-                val newPos = max(0, exoPlayer.currentPosition - seekTime)
-                if (newPos != exoPlayer.currentPosition) {
-                    exoPlayer.seekTo(newPos)
-                }
+            e.x < surface_view_video.width / 4 -> {
+                seekImpl(exoPlayer.currentPosition - seekTime)
             }
-            e.x > 3 * surface_view.width / 4 -> {
-                exoPlayer.seekTo(exoPlayer.currentPosition + seekTime)
+            e.x > 3 * surface_view_video.width / 4 -> {
+                seekImpl(exoPlayer.currentPosition + seekTime)
             }
             else -> togglePlay()
         }
@@ -806,8 +847,18 @@ class PlayerActivity : AppCompatActivity(),
         handler.postDelayed(updateProgressRunnable, SEEK_BAR_UPDATE_INTERVAL)
     }
 
+    private val audioFocusListener: AudioManager.OnAudioFocusChangeListener =
+        AudioManager.OnAudioFocusChangeListener { focusChange ->
+            if (focusChange != AudioManager.AUDIOFOCUS_GAIN) {
+                if (exoPlayer.isPlaying) {
+                    togglePlay()
+                }
+            }
+        }
+
     private fun togglePlay() {
         if (exoPlayer.isPlaying) {
+            audioManager.abandonAudioFocus(audioFocusListener)
             exoPlayer.setSeekParameters(SeekParameters.EXACT)
             stopPosition = exoPlayer.currentPosition
             Log.v(TAG, "stopPosition = $stopPosition")
@@ -816,6 +867,11 @@ class PlayerActivity : AppCompatActivity(),
             button_play.playAnimation()
             showControls(true)
         } else {
+            audioManager.requestAudioFocus(
+                audioFocusListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
             exoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
             exoPlayer.playWhenReady = true
             button_play.speed = -PLAY_BUTTON_ANIMATION_SPEED
