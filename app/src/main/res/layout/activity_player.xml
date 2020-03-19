@@ -204,4 +204,13 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <ru.rofleksey.animewatcher.ui.PlayerProgressView
+        android:id="@+id/hud_progress"
+        android:layout_width="match_parent"
+        android:layout_height="3px"
+        app:layout_constraintEnd_toEndOf="@id/aspect_ratio_video_frame_layout"
+        app:layout_constraintStart_toStartOf="@id/aspect_ratio_video_frame_layout"
+        app:layout_constraintTop_toTopOf="@id/aspect_ratio_video_frame_layout"
+        tools:ignore="PxUsage" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

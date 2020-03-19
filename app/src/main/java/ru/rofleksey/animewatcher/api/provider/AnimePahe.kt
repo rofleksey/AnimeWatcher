@@ -1,8 +1,10 @@
 package ru.rofleksey.animewatcher.api.provider
 
 import android.content.Context
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonParser
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import ru.rofleksey.animewatcher.api.model.EpisodeInfo
 import ru.rofleksey.animewatcher.api.model.ProviderResult
 import ru.rofleksey.animewatcher.api.model.ProviderStats
@@ -10,6 +12,7 @@ import ru.rofleksey.animewatcher.api.model.TitleInfo
 import ru.rofleksey.animewatcher.api.provider.template.PaheEpisodesResponse
 import ru.rofleksey.animewatcher.api.provider.template.PaheTitleResponse
 import ru.rofleksey.animewatcher.api.util.ApiUtil
+import ru.rofleksey.animewatcher.api.util.ApiUtil.Companion.bypassCloudflare
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 
@@ -67,18 +70,22 @@ class AnimePahe(context: Context) : AnimeProvider(context) {
                 .host(HOST)
                 .addPathSegment("api")
                 .addQueryParameter("m", "embed")
-                .addQueryParameter("id", episodeInfo["id"])
+                .addQueryParameter("id", titleInfo["id"])
+                .addQueryParameter("session", episodeInfo["session"])
                 .addQueryParameter("p", "kwik")
         }, { this }, {
-            val obj = JsonParser.parseString(this.actualBody()).asJsonObject
+            val body = this.actualBody()
+            Log.v(TAG, body)
+            val obj = JsonParser.parseString(body).asJsonObject
             val data = obj.getAsJsonObject("data")
-            val ep = data.getAsJsonObject(episodeInfo["id"])
-            val links = mutableListOf<ProviderResult>()
-            for (prop in ep.entrySet()) {
-                val quality = ApiUtil.strToQuality(prop.key)
-                links.add(ProviderResult(prop.value.asJsonObject.get("url").asString, quality))
+            data.entrySet().map { dataEntry ->
+                dataEntry.value.asJsonObject.entrySet().first().run {
+                    ProviderResult(
+                        value.asJsonObject.get("url").asString,
+                        ApiUtil.strToQuality(key)
+                    )
+                }
             }
-            links
         })
     }
 
@@ -93,8 +100,18 @@ class AnimePahe(context: Context) : AnimeProvider(context) {
     }
 
     private suspend fun bypass() {
-        bypassCloudflare(context, host = HOST, title = "animepahe", cookieHost = HOST)
-        bypassCloudflare(context, host = "i.$HOST", title = "animepahe", cookieHost = HOST)
+        bypassCloudflare(
+            context,
+            url = "https://$HOST".toHttpUrl(),
+            title = "animepahe",
+            cookieHost = HOST
+        )
+        bypassCloudflare(
+            context,
+            url = "https://i.$HOST".toHttpUrl(),
+            title = "animepahe",
+            cookieHost = HOST
+        )
     }
 
 }

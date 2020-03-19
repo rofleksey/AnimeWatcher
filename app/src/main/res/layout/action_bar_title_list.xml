@@ -8,6 +8,16 @@
     android:layout_height="match_parent">
 
     <com.mikepenz.iconics.view.IconicsImageButton
+        android:id="@+id/button_clear_cache"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginRight="15dp"
+        android:layout_weight="0"
+        app:iiv_color="@color/colorHighlight"
+        app:iiv_icon="cmd-shield-refresh" />
+
+
+    <com.mikepenz.iconics.view.IconicsImageButton
         android:id="@+id/button_search"
         android:layout_width="36dp"
         android:layout_height="36dp"

@@ -1,7 +1,9 @@
 package ru.rofleksey.animewatcher.api.util
 
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -65,7 +67,10 @@ class HttpHandler {
             .url(url)
             .build()
 
-        val response = httpClient.newCall(request).await()
+        val response = withContext(Dispatchers.IO) {
+            httpClient.newCall(request).await()
+        }
+
         return response.responseProcessor()
     }
 }
@@ -81,7 +86,7 @@ suspend fun Call.await(): Response {
             override fun onResponse(call: Call, response: Response) {
                 if (!response.isSuccessful) {
                     if (continuation.isCancelled) return
-                    continuation.resumeWithException(IOException("Unexpected code $response"))
+                    continuation.resumeWithException(IOException("(${response.code}) ${response.message}"))
                     return
                 }
                 continuation.resume(response)

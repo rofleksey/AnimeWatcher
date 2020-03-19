@@ -54,7 +54,9 @@
             </intent-filter>
         </activity>
         <activity android:name=".activity.EpisodeListActivity" />
-        <activity android:name=".activity.SearchActivity" />
+        <activity
+            android:name=".activity.SearchActivity"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>

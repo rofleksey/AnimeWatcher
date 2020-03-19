@@ -2,29 +2,15 @@ package ru.rofleksey.animewatcher.api.provider
 
 import android.content.Context
 import android.util.Log
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.model.LazyHeaders
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import okhttp3.Cookie
-import okhttp3.HttpUrl
 import ru.rofleksey.animewatcher.api.model.*
 import ru.rofleksey.animewatcher.api.util.HttpHandler
-import ru.rofleksey.animewatcher.api.util.WebViewWrapper
 import ru.rofleksey.animewatcher.util.AnimeUtils
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 abstract class AnimeProvider(val context: Context) {
     companion object {
-        private const val CLOUDFLARE_TIME_THRESHOLD = 1000 * 60 * 5
         private const val TAG = "AnimeProvider"
-        private const val CLOUDFLARE_TAG = "CloudflareBypass"
-        private const val BYPASS_TIMEOUT = 11000L
     }
 
     abstract suspend fun search(title: String): List<TitleInfo>
@@ -74,62 +60,5 @@ abstract class AnimeProvider(val context: Context) {
         } catch (e: IllegalArgumentException) {
             null
         }
-    }
-
-    protected suspend fun bypassCloudflare(
-        context: Context,
-        host: String,
-        title: String,
-        cookieHost: String
-    ) {
-        val prefs = context.getSharedPreferences("cloudflare", Context.MODE_PRIVATE)
-        val lastTime = prefs.getLong(host, 0)
-        val curTime = System.currentTimeMillis()
-        if (!(curTime - lastTime > CLOUDFLARE_TIME_THRESHOLD || lastTime > curTime)) {
-            Log.v(
-                CLOUDFLARE_TAG,
-                "Skipped, ${(CLOUDFLARE_TIME_THRESHOLD - (curTime - lastTime)) / 1000}s till next bypass"
-            )
-            return
-        }
-        Log.v(CLOUDFLARE_TAG, "bypassing...")
-        val url = HttpUrl.Builder()
-            .scheme("https")
-            .host(host)
-            .build()
-        val result: MutableList<Cookie> = mutableListOf()
-        withContext(Dispatchers.Main) {
-            val webWrapper = WebViewWrapper.with(context)
-            withTimeout(BYPASS_TIMEOUT) {
-                suspendCancellableCoroutine<Unit> { cont ->
-                    webWrapper.webView.webViewClient = object : WebViewClient() {
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            try {
-                                if (webWrapper.webView.title.contains(title) && url != null) {
-                                    result.clear()
-                                    result.addAll(webWrapper.getCookies(url, cookieHost))
-                                    cont.resume(Unit)
-                                } else {
-                                    Log.v(
-                                        CLOUDFLARE_TAG,
-                                        "page title = ${webWrapper.webView.title}"
-                                    )
-                                }
-                            } catch (e: Throwable) {
-                                cont.resumeWithException(e)
-                            }
-                        }
-                    }
-                    webWrapper.webView.loadUrl(url.toString())
-                    cont.invokeOnCancellation {
-                        webWrapper.destroy()
-                    }
-                }
-                webWrapper.destroy()
-            }
-        }
-        HttpHandler.instance.saveCookies(url, result)
-        prefs.edit().putLong(host, curTime).apply()
-        Log.v(CLOUDFLARE_TAG, "Bypass OK")
     }
 }

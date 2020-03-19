@@ -1,7 +1,7 @@
 package ru.rofleksey.animewatcher.api.storage.english
 
+import android.content.Context
 import android.util.Log
-import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MultipartBody
 import org.jsoup.Jsoup
@@ -10,9 +10,9 @@ import ru.rofleksey.animewatcher.api.model.StorageResult
 import ru.rofleksey.animewatcher.api.storage.Storage
 import ru.rofleksey.animewatcher.api.unpackers.PACKERUnpacker
 import ru.rofleksey.animewatcher.api.util.ApiUtil
+import ru.rofleksey.animewatcher.api.util.ApiUtil.Companion.bypassCloudflare
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
-import java.net.URI
 
 class KwikStorage private constructor() :
     Storage {
@@ -23,8 +23,8 @@ class KwikStorage private constructor() :
         val instance: KwikStorage by lazy { HOLDER.INSTANCE }
 //        private val downloadRegex = Regex("download:'([^']+)'")
         private val urlRegex = Regex("/./")
-        private val tokenRegex = Regex("var [_a-zA-Z0-9]+=\"([^\"]+)\"")
-        private val linkRegex = Regex("action=\"([^\"]+)\"")
+        private val tokenRegex = Regex("value=\"([^\"]+?)\"")
+        private val linkRegex = Regex("action=\"([^\"]+?)\"")
     }
 
     private object HOLDER {
@@ -35,24 +35,14 @@ class KwikStorage private constructor() :
 
     private data class DownloadExtraction(val link: String, val token: String)
 
-    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
-        val uri = URI(providerResult.link)
-        // E
-//        val downloadKwikSite = HttpHandler.instance.executeDirect({
-//            this.scheme(uri.scheme).host(uri.host).addPathSegments(uri.path)
-//        }, { this.addHeader("Referer", url) }, {
-//            val doc = Jsoup.parse(this.actualBody())
-//            val script = doc.selectFirst("body > script:nth-child(6)")
-//            val scriptText = script.data()
-//            val unpacked = PACKERUnpacker.unpack(scriptText)
-//            Log.v(TAG, unpacked)
-//            ApiUtil.getRegex(unpacked,
-//                downloadRegex
-//            )
-//        })
-        // F
+    override suspend fun extract(
+        context: Context,
+        providerResult: ProviderResult
+    ): List<StorageResult> {
         val downloadKwikSite = providerResult.link.replace(urlRegex, "/f/")
+        bypassCloudflare(context, downloadKwikSite.toHttpUrl(), "Kwik", "kwik.cx")
         Log.v(TAG, "downloadKwikSite - $downloadKwikSite")
+        //bypassCloudflare(context, "https://kwik.cx".toHttpUrl(), "Kwik", "kwik.cx")
         val (link, token) = HttpHandler.instance.executeDirect({
             downloadKwikSite.toHttpUrl().newBuilder()
         }, { this.addHeader("Referer", downloadKwikSite) }, {
@@ -64,24 +54,19 @@ class KwikStorage private constructor() :
             Log.v(TAG, "unpacked = $unpacked")
             DownloadExtraction(
                 ApiUtil.getRegex(unpacked, linkRegex),
-                ApiUtil.getRegex(unpacked, tokenRegex).reversed()
+                ApiUtil.getRegex(unpacked, tokenRegex)
             )
         })
         // D
-        val finalUri = URI(link)
-        val fUrl =
-            HttpUrl.Builder().scheme(uri.scheme).host(uri.host).addPathSegments(downloadKwikSite)
-                .build()
         return HttpHandler.instance.executeDirect({
-            this.scheme(finalUri.scheme).host(finalUri.host).addPathSegments(finalUri.path)
-                .query(finalUri.query)
+            link.toHttpUrl().newBuilder()
         }, {
             this.post(
                 MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
                     .addFormDataPart("_token", token)
                     .build()
-            ).addHeader("Referer", fUrl.toString())
+            ).addHeader("Referer", downloadKwikSite)
         }, {
             val result = this.request.url.toString()
             listOf(StorageResult(result, providerResult.quality))

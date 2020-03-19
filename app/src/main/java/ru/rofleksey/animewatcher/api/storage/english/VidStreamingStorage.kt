@@ -1,5 +1,6 @@
 package ru.rofleksey.animewatcher.api.storage.english
 
+import android.content.Context
 import android.util.Log
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.jsoup.Jsoup
@@ -25,7 +26,10 @@ class VidStreamingStorage : Storage {
             VidStreamingStorage()
     }
 
-    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
+    override suspend fun extract(
+        context: Context,
+        providerResult: ProviderResult
+    ): List<StorageResult> {
         val urlArg = ApiUtil.sanitizeScheme(providerResult.link)
         Log.v(TAG, providerResult.link)
         val redirect = HttpHandler.instance.executeDirect({

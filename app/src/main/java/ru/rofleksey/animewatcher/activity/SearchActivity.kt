@@ -53,7 +53,7 @@ class SearchActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "SearchActivity"
         private const val CROSSFADE_DURATION = 500
-        private const val SEARCH_DELAY = 350L
+        private const val SEARCH_DELAY = 500L
         private const val ITEM_MARGIN = 30
         private const val SEARCH_HINT = "Search on"
         private const val TAPS_TILL_SECRET = 5
@@ -165,9 +165,9 @@ class SearchActivity : AppCompatActivity() {
                             toast(this@SearchActivity, "Using AnimePahe")
                         }
                         1 -> {
-                            providerName = ProviderFactory.ANIMEDUB
+                            providerName = ProviderFactory.KISSANIME
                             provider = ProviderFactory.get(this@SearchActivity, providerName)
-                            toast(this@SearchActivity, "Using AnimeDub")
+                            toast(this@SearchActivity, "Using KissAnime")
                         }
                         2 -> {
                             providerName = ProviderFactory.GOGOANIME
@@ -178,6 +178,16 @@ class SearchActivity : AppCompatActivity() {
                             providerName = ProviderFactory.KICKASSANIME
                             provider = ProviderFactory.get(this@SearchActivity, providerName)
                             toast(this@SearchActivity, "Using KickassAnime")
+                        }
+                        4 -> {
+                            providerName = ProviderFactory.ANIMEDUB
+                            provider = ProviderFactory.get(this@SearchActivity, providerName)
+                            toast(this@SearchActivity, "Using AnimeDub")
+                        }
+                        5 -> {
+                            providerName = ProviderFactory.YOUTUBE
+                            provider = ProviderFactory.get(this@SearchActivity, providerName)
+                            toast(this@SearchActivity, "Using Youtube")
                         }
                         else -> {
                             toast(this@SearchActivity, "ERROR: INVALID PROVIDER")
@@ -298,6 +308,9 @@ class SearchActivity : AppCompatActivity() {
                 titleData.addAll(results)
                 diff.dispatchUpdatesTo(adapter)
             } catch (e: Exception) {
+                if (e is CancellationException) {
+                    return@launch
+                }
                 e.printStackTrace()
                 snackbar =
                     Snackbar.make(

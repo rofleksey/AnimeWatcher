@@ -11,6 +11,7 @@ import ru.rofleksey.animewatcher.api.model.*
 import ru.rofleksey.animewatcher.api.provider.template.KickassEpisodeEntry
 import ru.rofleksey.animewatcher.api.provider.template.KickassTitleEntry
 import ru.rofleksey.animewatcher.api.util.ApiUtil
+import ru.rofleksey.animewatcher.api.util.ApiUtil.Companion.bypassCloudflare
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 
@@ -148,7 +149,12 @@ class KickassAnime(context: Context) : AnimeProvider(context) {
     }
 
     private suspend fun bypass() {
-        bypassCloudflare(context, host = HOST_WWW, title = "Anime", cookieHost = HOST_WWW)
+        bypassCloudflare(
+            context,
+            url = "https://${HOST_WWW}".toHttpUrl(),
+            title = "Anime",
+            cookieHost = HOST_WWW
+        )
     }
 
 }

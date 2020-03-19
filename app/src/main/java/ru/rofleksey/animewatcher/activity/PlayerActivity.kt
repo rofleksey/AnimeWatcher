@@ -73,7 +73,7 @@ class PlayerActivity : AppCompatActivity(),
         const val PLAYBACK_SLOW_PITCH = 0.75f
         const val PLAYBACK_FAST_SPEED = 3f
         const val PLAYBACK_FAST_PITCH = 1.25f
-        const val REWIND_SPEED = 100L
+        const val REWIND_SPEED = 500L
     }
 
     private lateinit var filePath: String
@@ -177,7 +177,7 @@ class PlayerActivity : AppCompatActivity(),
                 }
                 if (rewinding) {
                     rewinding = false
-                    rewindStopStream = soundPool?.play(rewindStopSound, 0.2f, 0.4f, 0, 0, 1f)
+                    rewindStopStream = soundPool?.play(rewindStopSound, 0.2f, 0.2f, 0, 0, 1f)
                     soundPool?.stop(rewindStartStream ?: 0)
                     soundPool?.stop(rewindLoopStream ?: 0)
                     if (!exoPlayer.isPlaying) {
@@ -276,10 +276,10 @@ class PlayerActivity : AppCompatActivity(),
             .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
             .setBackBuffer(15 * 1000, true)
             .setBufferDurationsMs(
-                60 * 1000,
+                1000,
                 5 * 60 * 1000,
-                500,
-                2000
+                25,
+                1000
             )
             .setTargetBufferBytes(DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES)
             .setPrioritizeTimeOverSizeThresholds(DefaultLoadControl.DEFAULT_PRIORITIZE_TIME_OVER_SIZE_THRESHOLDS)
@@ -522,8 +522,8 @@ class PlayerActivity : AppCompatActivity(),
                         (curPos / 1000f).toString(),
                         "-i",
                         inputPath,
-                        "-q:v",
-                        "1",
+                        "-sn",
+                        "-q:v", "1",
                         "-vframes",
                         "1",
                         file.toString()
@@ -778,8 +778,8 @@ class PlayerActivity : AppCompatActivity(),
                     exoPlayer.setSeekParameters(SeekParameters.PREVIOUS_SYNC)
                     seekImpl(exoPlayer.currentPosition - REWIND_SPEED)
                     soundPool?.stop(rewindStopStream ?: 0)
-                    rewindStartStream = soundPool?.play(rewindStartSound, 0.4f, 0.2f, 0, 0, 1f)
-                    rewindLoopStream = soundPool?.play(rewindLoopSound, 0.6f, 0.6f, 0, -1, 1f)
+                    rewindStartStream = soundPool?.play(rewindStartSound, 0.2f, 0.2f, 0, 0, 1f)
+                    rewindLoopStream = soundPool?.play(rewindLoopSound, 0.3f, 0.3f, 0, -1, 1f)
                 }
                 e.x > 3 * surface_view_video.width / 4 -> {
                     alteredSpeedPlayback = true
@@ -844,6 +844,7 @@ class PlayerActivity : AppCompatActivity(),
             seek_bar.max = exoPlayer.duration.toInt()
             seek_bar.progress = exoPlayer.currentPosition.toInt()
         }
+        hud_progress.setProgress(exoPlayer.currentPosition, exoPlayer.duration)
         handler.postDelayed(updateProgressRunnable, SEEK_BAR_UPDATE_INTERVAL)
     }
 

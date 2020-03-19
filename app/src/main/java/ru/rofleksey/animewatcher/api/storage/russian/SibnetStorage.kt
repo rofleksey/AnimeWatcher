@@ -1,5 +1,6 @@
 package ru.rofleksey.animewatcher.api.storage.russian
 
+import android.content.Context
 import android.util.Log
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -25,7 +26,10 @@ class SibnetStorage: Storage {
             SibnetStorage()
     }
 
-    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
+    override suspend fun extract(
+        context: Context,
+        providerResult: ProviderResult
+    ): List<StorageResult> {
         val redirectUrl = HttpHandler.instance.executeDirect({
             providerResult.link.toHttpUrl().newBuilder()
         }, { this }, {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import android.webkit.CookieManager
+import android.webkit.ValueCallback
 import android.webkit.WebView
 import okhttp3.Cookie
 import ru.rofleksey.animewatcher.util.AnimeUtils
@@ -12,12 +13,14 @@ class WebViewWrapper private constructor(val webView: WebView) {
     companion object {
         private const val TAG = "WebViewWrapper"
 
-        fun with(context: Context): WebViewWrapper {
+        fun with(context: Context, clearCookies: Boolean): WebViewWrapper {
             val webView = WebView(context)
             webView.setWillNotDraw(true)
-//            CookieManager.getInstance().removeAllCookies(ValueCallback {
-//
-//            })
+            if (clearCookies) {
+                CookieManager.getInstance().removeAllCookies(ValueCallback {
+
+                })
+            }
             webView.clearCache(false)
             with(webView.settings) {
                 javaScriptEnabled = true
@@ -26,6 +29,7 @@ class WebViewWrapper private constructor(val webView: WebView) {
             }
             return WebViewWrapper(webView)
         }
+
 
         private val cookieRegex = Regex("([^=]+)=([^\\;]*);?\\s?")
     }

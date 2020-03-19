@@ -13,6 +13,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import android.view.inputmethod.InputMethodManager
+import android.webkit.CookieManager
+import android.webkit.ValueCallback
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.ActionBar
@@ -32,6 +34,7 @@ import com.takusemba.spotlight.Target
 import com.takusemba.spotlight.effet.RippleEffect
 import com.takusemba.spotlight.shape.Circle
 import jp.wasabeef.recyclerview.animators.ScaleInAnimator
+import kotlinx.android.synthetic.main.action_bar_title_list.*
 import kotlinx.coroutines.*
 import ru.rofleksey.animewatcher.R
 import ru.rofleksey.animewatcher.api.provider.ProviderFactory
@@ -129,6 +132,16 @@ class TitleListActivity : AppCompatActivity() {
                     ITEM_MARGIN
             }
         })
+
+        button_clear_cache.setOnClickListener {
+            val prefs = getSharedPreferences("cloudflare", Context.MODE_PRIVATE)
+            prefs.edit().clear().apply()
+            CookieManager.getInstance().removeAllCookies(ValueCallback {
+
+            })
+            AnimeUtils.toast(this, "Cache cleared!")
+        }
+
         layoutManager = LinearLayoutManager(this)
         recyclerView.layoutManager = layoutManager
         adapter = TitleEntryAdapter(titleData)

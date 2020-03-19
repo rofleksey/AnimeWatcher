@@ -312,7 +312,7 @@ class DownloadActivity : AppCompatActivity() {
 
                         var prependIndex = 0
                         val result = withContext(Dispatchers.IO) {
-                            storage.extract(providerResult)
+                            storage.extract(this@DownloadActivity, providerResult)
                         }.sortedBy {
                             -it.quality.num
                         }.flatMap { result ->

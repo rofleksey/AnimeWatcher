@@ -1,5 +1,6 @@
 package ru.rofleksey.animewatcher.api.storage.russian
 
+import android.content.Context
 import android.util.Base64
 import android.util.Log
 import com.google.gson.Gson
@@ -22,7 +23,7 @@ class HaloAniStorage : Storage {
         const val NAME = "haloani.ru"
         const val SCORE = 10
         private val gson = Gson()
-        val INSTANCE: HaloAniStorage by lazy { HOLDER.INSTANCE }
+        val instance: HaloAniStorage by lazy { HOLDER.INSTANCE }
         private val rootSourcesRegex = Regex("var sources = (\\[\\{.*?\\}\\])")
         private val sourcesRegex = Regex("sources: (\\[\\{.*?\\}\\])")
         private val base64regex = Regex("document.write\\(Base64.decode\\(\"([^\"]+)\"\\)\\)")
@@ -41,7 +42,10 @@ class HaloAniStorage : Storage {
 
     private data class SourceEntry(val file: String, val label: String, val type: String)
 
-    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
+    override suspend fun extract(
+        context: Context,
+        providerResult: ProviderResult
+    ): List<StorageResult> {
         val doc = HttpHandler.instance.executeDirect({
             providerResult.link.toHttpUrl().newBuilder()
         }, { this }, {

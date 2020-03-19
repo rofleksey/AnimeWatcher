@@ -15,13 +15,19 @@ class EpisodeInfo(
         fields[name] = value
     }
 
+    override fun toString(): String {
+        return "EpisodeInfo(name='$name', image=$image)"
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
 
         other as EpisodeInfo
+
         if (name != other.name) return false
         if (image != other.image) return false
+        if (fields != other.fields) return false
 
         return true
     }
@@ -29,11 +35,8 @@ class EpisodeInfo(
     override fun hashCode(): Int {
         var result = name.hashCode()
         result = 31 * result + (image?.hashCode() ?: 0)
+        result = 31 * result + fields.hashCode()
         return result
-    }
-
-    override fun toString(): String {
-        return "EpisodeInfo(name='$name', image=$image)"
     }
 
 

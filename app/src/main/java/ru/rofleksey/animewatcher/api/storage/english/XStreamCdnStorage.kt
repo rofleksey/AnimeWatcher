@@ -1,5 +1,6 @@
 package ru.rofleksey.animewatcher.api.storage.english
 
+import android.content.Context
 import android.util.Log
 import com.google.gson.JsonParser
 import okhttp3.HttpUrl
@@ -28,7 +29,10 @@ class XStreamCdnStorage : Storage {
             XStreamCdnStorage()
     }
 
-    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
+    override suspend fun extract(
+        context: Context,
+        providerResult: ProviderResult
+    ): List<StorageResult> {
         val httpUrl = providerResult.link.toHttpUrl()
         val segments = ArrayList(httpUrl.pathSegments).map {
             if (it == "v") "f" else it

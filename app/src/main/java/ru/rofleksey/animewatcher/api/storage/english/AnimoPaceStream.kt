@@ -1,5 +1,6 @@
 package ru.rofleksey.animewatcher.api.storage.english
 
+import android.content.Context
 import android.util.Base64
 import android.util.Log
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -28,7 +29,10 @@ class AnimoPaceStream private constructor() :
     }
 
 
-    override suspend fun extract(providerResult: ProviderResult): List<StorageResult> {
+    override suspend fun extract(
+        context: Context,
+        providerResult: ProviderResult
+    ): List<StorageResult> {
         val iframeSrc = HttpHandler.instance.executeDirect({
             ApiUtil.sanitizeScheme(providerResult.link).toHttpUrl().newBuilder()
         }, { this }, {

@@ -24,7 +24,8 @@ class StorageLocator {
                     "video.sibnet.ru" -> SibnetStorage.instance
                     "animedub.ru" -> AnimeDubStorage.instance
                     "animo-pace-stream.io" -> AnimoPaceStream.instance
-                    "haloani.ru" -> HaloAniStorage.INSTANCE
+                    "haloani.ru" -> HaloAniStorage.instance
+                    "bitchute.com" -> BitchuteStorage.instance
                     else -> null
                 }
             } catch (e: Exception) {
