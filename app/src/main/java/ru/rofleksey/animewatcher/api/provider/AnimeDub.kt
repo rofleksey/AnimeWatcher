@@ -94,7 +94,7 @@ class AnimeDub(context: Context) : AnimeProvider(context) {
         val httpUrl = titleInfo["link"].toHttpUrl()
         val sitePostId = httpUrl.pathSegments.last().split("-").first()
         titleInfo["sitePostId"] = sitePostId
-        return HttpHandler.instance.executeDirect({
+        HttpHandler.instance.executeDirect({
             HttpUrl.Builder()
                 .scheme("https")
                 .host(HOST)
@@ -105,6 +105,7 @@ class AnimeDub(context: Context) : AnimeProvider(context) {
                 .addQueryParameter("skin", "animedub")
         }, { this.addHeader("Referer", httpUrl.toString()) }, {
             val doc = Jsoup.parse(this.actualBody())
+            Log.v(TAG, "episodeListDoc = $doc")
             val options = doc.select("select[name=\"source\"] option")
             titleInfo["providerArray"] = options.joinToString(",") {
                 it.attr("value")
@@ -115,14 +116,39 @@ class AnimeDub(context: Context) : AnimeProvider(context) {
                 it.attr("value")
             }
             Log.v(TAG, "Dubbings: ${titleInfo["dubbingArray"]}")
-            val episodes = doc.select("select[name=\"series\"] option")
-            episodes.map {
-                EpisodeInfo(
-                    it.attr("value"),
-                    null
-                )
-            }
         })
+        val groups = ArrayList<List<EpisodeInfo>>()
+        val providerIds = titleInfo["providerArray"].split(",")
+        val dubbingIds = titleInfo["dubbingArray"].split(",")
+        providerIds.forEach { providerId ->
+            dubbingIds.forEach { dubbingId ->
+                HttpHandler.instance.executeDirect({
+                    HttpUrl.Builder()
+                        .scheme("https")
+                        .host(HOST)
+                        .addPathSegments("engine/ajax/controller.php")
+                        .addQueryParameter("mod", "iframeplayer")
+                        .addQueryParameter("post_id", sitePostId)
+                        .addQueryParameter("action", "selectors")
+                        .addQueryParameter("skin", "animedub")
+                        .addQueryParameter(
+                            "select",
+                            "source=$providerId&dubbing=${dubbingId}&series=1"
+                        )
+                }, { this.addHeader("Referer", httpUrl.toString()) }, {
+                    val doc = Jsoup.parse(this.actualBody())
+                    val episodes = doc.select("select[name=\"series\"] option")
+                    val arr = episodes.map {
+                        EpisodeInfo(
+                            it.attr("value"),
+                            null
+                        )
+                    }
+                    groups.add(arr)
+                })
+            }
+        }
+        return groups.maxBy { it.size } ?: listOf()
     }
 
     override suspend fun getStorageLinks(
@@ -132,30 +158,37 @@ class AnimeDub(context: Context) : AnimeProvider(context) {
         val httpUrl = titleInfo["link"].toHttpUrl()
         val providerIds = titleInfo["providerArray"].split(",")
         val dubbingIds = titleInfo["dubbingArray"].split(",")
-        return providerIds.map { providerId ->
-            HttpHandler.instance.executeDirect({
-                HttpUrl.Builder()
-                    .scheme("https")
-                    .host(HOST)
-                    .addPathSegments("engine/ajax/controller.php")
-                    .addQueryParameter("mod", "iframeplayer")
-                    .addQueryParameter("post_id", titleInfo["sitePostId"])
-                    .addQueryParameter("action", "iframe")
-                    .addQueryParameter("select",
-                        "source=$providerId&dubbing=${dubbingIds.first()}&series=${episodeInfo.name}")
-                    .addQueryParameter("skin", "animedub")
-            }, { this.addHeader("Referer", httpUrl.toString()) }, {
-                ProviderResult(
-                    ApiUtil.sanitizeScheme(this.actualBody()).also {
-                        Log.v(
-                            TAG,
-                            "storageLink = $it"
+        val output = ArrayList<ProviderResult>()
+        providerIds.forEach { providerId ->
+            dubbingIds.forEach { dubbingId ->
+                val res = HttpHandler.instance.executeDirect({
+                    HttpUrl.Builder()
+                        .scheme("https")
+                        .host(HOST)
+                        .addPathSegments("engine/ajax/controller.php")
+                        .addQueryParameter("mod", "iframeplayer")
+                        .addQueryParameter("post_id", titleInfo["sitePostId"])
+                        .addQueryParameter("action", "iframe")
+                        .addQueryParameter(
+                            "select",
+                            "source=$providerId&dubbing=${dubbingId}&series=${episodeInfo.name}"
                         )
-                    },
-                    Quality.UNKNOWN
-                )
-            })
+                        .addQueryParameter("skin", "animedub")
+                }, { this.addHeader("Referer", httpUrl.toString()) }, {
+                    ProviderResult(
+                        ApiUtil.sanitizeScheme(this.actualBody()).also {
+                            Log.v(
+                                TAG,
+                                "storageLink = $it"
+                            )
+                        },
+                        Quality.UNKNOWN
+                    )
+                })
+                output.add(res)
+            }
         }
+        return output
     }
 
     override fun stats(): ProviderStats {

@@ -1,10 +1,7 @@
 package ru.rofleksey.animewatcher.activity
 
 import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 import android.content.pm.ActivityInfo
 import android.media.AudioAttributes
 import android.media.AudioManager
@@ -34,6 +31,8 @@ import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultAllocator
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
 import com.google.android.exoplayer2.util.Util
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.android.synthetic.main.activity_player.*
 import kotlinx.coroutines.*
 import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler
@@ -55,6 +54,7 @@ class PlayerActivity : AppCompatActivity(),
     companion object {
         const val TAG = "GifSaveActivity"
         const val ARG_FILE = "argFile"
+        const val VIDEO_DATA_LIST_KEY = "videoDataList"
         const val PLAY_BUTTON_MAX_FRAME = 25
         const val PLAY_BUTTON_ANIMATION_SPEED = 2.0f
         const val FAST_SEEK_TIME_FAR = 10000L
@@ -62,18 +62,19 @@ class PlayerActivity : AppCompatActivity(),
         const val SEEK_MULT_FAR = 1f
         const val SEEK_MULT_NEAR = 0.01f
         const val SEEK_FUNC_MULT = 4f
-        const val SEEK_FUNC_POWER = 1.6f
+        const val SEEK_FUNC_POWER = 1.65f
         const val SEEK_ANIMATION_TIME = 150L
         const val CONTROLS_ANIMATION_TIME = 200L
         const val LOADING_ANIMATION_TIME = 450L
         const val HIDE_CONTROLS_TIME = 3500L
         const val SEEK_BAR_UPDATE_INTERVAL = 100L
         const val SEEK_GO_BACK_ON_RESUME_TIME = 5000L
-        const val PLAYBACK_SLOW_SPEED = 0.33f
-        const val PLAYBACK_SLOW_PITCH = 0.75f
-        const val PLAYBACK_FAST_SPEED = 3f
-        const val PLAYBACK_FAST_PITCH = 1.25f
+        const val PLAYBACK_SLOW_SPEED = 0.25f
+        const val PLAYBACK_SLOW_PITCH = 0.8f
+        const val PLAYBACK_FAST_SPEED = 5f
+        const val PLAYBACK_FAST_PITCH = 1.2f
         const val REWIND_SPEED = 500L
+        const val MAX_VIDEO_DATA_LENGTH = 10
     }
 
     private lateinit var filePath: String
@@ -81,8 +82,10 @@ class PlayerActivity : AppCompatActivity(),
     private lateinit var exoPlayer: SimpleExoPlayer
     private lateinit var becomingNoisyReceiver: BecomingNoisyReceiver
     private lateinit var audioManager: AudioManager
+    private lateinit var sharedPreferences: SharedPreferences
 
     private val handler = Handler()
+    private val gson = Gson()
 
     private var stopPosition: Long = 0
     private var seekStartPosition: Long = 0
@@ -106,6 +109,7 @@ class PlayerActivity : AppCompatActivity(),
     private var seekAnimation: YoYo.YoYoString? = null
     private var alteredSpeedPlayback = false
     private var rewinding = false
+    private var finishingVideo = false
 
     private var job: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
@@ -140,6 +144,8 @@ class PlayerActivity : AppCompatActivity(),
         }
     }
 
+    data class PlayerVideoData(val fileName: String, var lastPosition: Long)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(FEATURE_NO_TITLE)
@@ -150,7 +156,7 @@ class PlayerActivity : AppCompatActivity(),
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         setContentView(R.layout.activity_player)
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
+        sharedPreferences = getSharedPreferences("animeplayer", Context.MODE_PRIVATE)
         filePath =
             intent.getStringExtra(ARG_FILE) ?: AnimeUtils.getFileFromIntentData(this, intent.data)
                     ?: intent.data?.toString() ?: ""
@@ -244,7 +250,6 @@ class PlayerActivity : AppCompatActivity(),
             showControls(true)
         }
         if (savedInstanceState != null) {
-            stopPosition = savedInstanceState.getLong("stopPosition")
             gifStartPosition = savedInstanceState.getLong("gifStartPosition")
             gifEndPosition = savedInstanceState.getLong("gifEndPosition")
             setIntervals(gifStartPosition, gifEndPosition)
@@ -274,12 +279,12 @@ class PlayerActivity : AppCompatActivity(),
     private fun initPlayer() {
         val loadControl = DefaultLoadControl.Builder()
             .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
-            .setBackBuffer(15 * 1000, true)
+            .setBackBuffer(1000, true)
             .setBufferDurationsMs(
-                1000,
-                5 * 60 * 1000,
+                500,
+                60 * 1000,
                 25,
-                1000
+                500
             )
             .setTargetBufferBytes(DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES)
             .setPrioritizeTimeOverSizeThresholds(DefaultLoadControl.DEFAULT_PRIORITIZE_TIME_OVER_SIZE_THRESHOLDS)
@@ -342,6 +347,7 @@ class PlayerActivity : AppCompatActivity(),
                         }
                     }
                     Player.STATE_ENDED -> {
+                        finishingVideo = true
                         finish()
                     }
                 }
@@ -392,7 +398,44 @@ class PlayerActivity : AppCompatActivity(),
         initPlayer()
         exoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
         exoPlayer.setPlaybackParameters(PlaybackParameters(1f))
+        restoreVideoData()
         seekImpl(stopPosition - SEEK_GO_BACK_ON_RESUME_TIME)
+    }
+
+    private fun restoreVideoData() {
+        val listType = object : TypeToken<ArrayList<PlayerVideoData>>() {}.type
+        val videoDataList: ArrayList<PlayerVideoData> = gson.fromJson(
+            sharedPreferences.getString(
+                VIDEO_DATA_LIST_KEY, "[]"
+            ), listType
+        )
+        Log.v(TAG, "videoDataList = $videoDataList")
+        val data = videoDataList.find { it.fileName == filePath }
+        if (data != null) {
+            stopPosition = data.lastPosition
+        }
+    }
+
+    private fun saveVideoData() {
+        val listType = object : TypeToken<ArrayList<PlayerVideoData>>() {}.type
+        val videoDataList: ArrayList<PlayerVideoData> = gson.fromJson(
+            sharedPreferences.getString(
+                VIDEO_DATA_LIST_KEY, "[]"
+            ), listType
+        )
+        val posIndex = videoDataList.indexOfFirst { it.fileName == filePath }
+        if (posIndex == -1) {
+            if (videoDataList.size == MAX_VIDEO_DATA_LENGTH) {
+                videoDataList.removeAt(0)
+            }
+            videoDataList.add(PlayerVideoData(filePath, stopPosition))
+        } else {
+            videoDataList[posIndex].lastPosition = stopPosition
+            val temp = videoDataList.last()
+            videoDataList[videoDataList.size - 1] = videoDataList[posIndex]
+            videoDataList[posIndex] = temp
+        }
+        sharedPreferences.edit().putString(VIDEO_DATA_LIST_KEY, gson.toJson(videoDataList)).apply()
     }
 
     override fun onResume() {
@@ -420,12 +463,12 @@ class PlayerActivity : AppCompatActivity(),
         seek_loading.visibility = View.GONE
         seek_text.visibility = View.GONE
         seekDistanceCounter.reset()
-        stopPosition = exoPlayer.currentPosition
+        stopPosition = if (finishingVideo) 0 else exoPlayer.currentPosition
+        saveVideoData()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putLong("stopPosition", stopPosition)
         outState.putLong("gifStartPosition", gifStartPosition)
         outState.putLong("gifEndPosition", gifEndPosition)
         Log.v(TAG, "lifecycle: stored vars in onSaveInstanceState")
@@ -862,7 +905,6 @@ class PlayerActivity : AppCompatActivity(),
             audioManager.abandonAudioFocus(audioFocusListener)
             exoPlayer.setSeekParameters(SeekParameters.EXACT)
             stopPosition = exoPlayer.currentPosition
-            Log.v(TAG, "stopPosition = $stopPosition")
             exoPlayer.playWhenReady = false
             button_play.speed = PLAY_BUTTON_ANIMATION_SPEED
             button_play.playAnimation()

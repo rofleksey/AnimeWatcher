@@ -15,7 +15,7 @@
     <string-array name="providers">
         <item>AnimePahe (cloudflare)</item>
         <item>KissAnime (slow initialization)</item>
-        <item>GogoAnime (medium speed)</item>
+        <item>GogoAnime (slow)</item>
         <item>KickassAnime (cloudflare, lq)</item>
         <item>AnimeDub (ru)</item>
         <item>Youtube playlists</item>

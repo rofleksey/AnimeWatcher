@@ -17,7 +17,7 @@ class StorageLocator {
                 Log.v(TAG, "locating host of $url")
                 when (host) {
                     "kwik.cx" -> KwikStorage.instance
-                    "mp4upload.com" -> Mp4UploadStorage.instance
+                    //"mp4upload.com" -> Mp4UploadStorage.instance
                     "vidstreaming.io" -> VidStreamingStorage.instance
                     "gcloud.live", "feurl.com", "fembed.com" -> XStreamCdnStorage.instance
                     "my.mail.ru", "videoapi.my.mail.ru" -> MailRuStorage.instance
