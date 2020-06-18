@@ -49,7 +49,7 @@ class KwikStorage private constructor() :
         val (link, token) = puppeteerPage(context, downloadKwikSite.toHttpUrl(), headers) { body ->
             val doc = Jsoup.parse(body)
             Log.d(TAG, "lmao = ${doc.selectFirst("form")}")
-            val form = doc.selectFirst(".download-form > form")
+            val form = doc.selectFirst("form")
             Log.d(TAG, "form = $form")
             val input = form.selectFirst("input")
             DownloadExtraction(

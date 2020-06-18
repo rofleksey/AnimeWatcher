@@ -77,13 +77,20 @@ class AnimePahe(context: Context) : AnimeProvider(context) {
             val body = this.actualBody()
             Log.v(TAG, body)
             val obj = JsonParser.parseString(body).asJsonObject
-            val data = obj.getAsJsonObject("data")
-            data.entrySet().map { dataEntry ->
-                dataEntry.value.asJsonObject.entrySet().first().run {
-                    ProviderResult(
-                        value.asJsonObject.get("url").asString,
-                        ApiUtil.strToQuality(key)
-                    )
+            Log.v(TAG, obj.toString())
+            val data = obj.getAsJsonArray("data")
+            data.map {
+                it.asJsonObject.entrySet()
+            }.flatMap {
+                it.flatMap { entry ->
+                    if (entry.value.asJsonObject.has("kwik")) {
+                        listOf(ProviderResult(
+                            entry.value.asJsonObject.get("kwik").asString,
+                            ApiUtil.strToQuality(entry.key)
+                        ))
+                    } else {
+                        listOf()
+                    }
                 }
             }
         })
@@ -110,7 +117,7 @@ class AnimePahe(context: Context) : AnimeProvider(context) {
             context,
             url = "https://i.$HOST".toHttpUrl(),
             title = "animepahe",
-            cookieHost = HOST
+            cookieHost = "i.$HOST"
         )
     }
 
