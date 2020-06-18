@@ -244,16 +244,16 @@ class TitleListActivity : AppCompatActivity() {
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TitleEntryViewHolder {
-            val titleView = LayoutInflater.from(parent.context).inflate(
-                R.layout.list_title_info, parent,
-                false
-            ) as ViewGroup
-            return TitleEntryViewHolder(
-                titleView,
-                titleView.findViewById(R.id.title_image),
-                titleView.findViewById(R.id.title_name),
-                titleView.findViewById(R.id.title_details)
-            )
+                val titleView = LayoutInflater.from(parent.context).inflate(
+                    R.layout.list_title_info, parent,
+                    false
+                ) as ViewGroup
+                return TitleEntryViewHolder(
+                    titleView,
+                    titleView.findViewById(R.id.title_image),
+                    titleView.findViewById(R.id.title_name),
+                    titleView.findViewById(R.id.title_details)
+                )
         }
 
         override fun onBindViewHolder(holder: TitleEntryViewHolder, pos: Int) {

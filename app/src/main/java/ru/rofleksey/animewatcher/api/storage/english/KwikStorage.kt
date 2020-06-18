@@ -11,6 +11,7 @@ import ru.rofleksey.animewatcher.api.storage.Storage
 import ru.rofleksey.animewatcher.api.unpackers.PACKERUnpacker
 import ru.rofleksey.animewatcher.api.util.ApiUtil
 import ru.rofleksey.animewatcher.api.util.ApiUtil.Companion.bypassCloudflare
+import ru.rofleksey.animewatcher.api.util.ApiUtil.Companion.puppeteerPage
 import ru.rofleksey.animewatcher.api.util.HttpHandler
 import ru.rofleksey.animewatcher.api.util.actualBody
 
@@ -43,20 +44,19 @@ class KwikStorage private constructor() :
         bypassCloudflare(context, downloadKwikSite.toHttpUrl(), "Kwik", "kwik.cx")
         Log.v(TAG, "downloadKwikSite - $downloadKwikSite")
         //bypassCloudflare(context, "https://kwik.cx".toHttpUrl(), "Kwik", "kwik.cx")
-        val (link, token) = HttpHandler.instance.executeDirect({
-            downloadKwikSite.toHttpUrl().newBuilder()
-        }, { this.addHeader("Referer", downloadKwikSite) }, {
-            val doc = Jsoup.parse(this.actualBody())
-            val scriptTag = doc.selectFirst("body > script:nth-child(6)")
-            val scriptText = scriptTag.data()
-            Log.v(TAG, "scriptTag.data() = $scriptText")
-            val unpacked = PACKERUnpacker.unpack(scriptText)
-            Log.v(TAG, "unpacked = $unpacked")
+        val headers = HashMap<String, String>()
+        headers["Referer"] = downloadKwikSite
+        val (link, token) = puppeteerPage(context, downloadKwikSite.toHttpUrl(), headers) { body ->
+            val doc = Jsoup.parse(body)
+            Log.d(TAG, "lmao = ${doc.selectFirst("form")}")
+            val form = doc.selectFirst(".download-form > form")
+            Log.d(TAG, "form = $form")
+            val input = form.selectFirst("input")
             DownloadExtraction(
-                ApiUtil.getRegex(unpacked, linkRegex),
-                ApiUtil.getRegex(unpacked, tokenRegex)
+                form.attr("action"),
+                input.attr("value")
             )
-        })
+        }
         // D
         return HttpHandler.instance.executeDirect({
             link.toHttpUrl().newBuilder()

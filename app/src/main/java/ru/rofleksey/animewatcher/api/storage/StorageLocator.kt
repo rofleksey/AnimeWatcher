@@ -6,6 +6,7 @@ import ru.rofleksey.animewatcher.api.storage.russian.AnimeDubStorage
 import ru.rofleksey.animewatcher.api.storage.russian.HaloAniStorage
 import ru.rofleksey.animewatcher.api.storage.russian.MailRuStorage
 import ru.rofleksey.animewatcher.api.storage.russian.SibnetStorage
+import ru.rofleksey.animewatcher.api.util.ApiUtil
 import java.net.URI
 
 class StorageLocator {
@@ -13,7 +14,7 @@ class StorageLocator {
         private const val TAG = "StorageLocator"
         fun locate(url: String): Storage? {
             return try {
-                val host = getHost(url) ?: return null
+                val host = ApiUtil.getHost(url) ?: return null
                 Log.v(TAG, "locating host of $url")
                 when (host) {
                     "kwik.cx" -> KwikStorage.instance
@@ -32,15 +33,6 @@ class StorageLocator {
                 e.printStackTrace()
                 null
             }
-        }
-
-        private fun getHost(url: String): String? {
-            val uri = URI(url)
-            val hostname = uri.host
-            if (hostname != null) {
-                return if (hostname.startsWith("www.")) hostname.substring(4) else hostname
-            }
-            return null
         }
     }
 }

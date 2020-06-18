@@ -5,27 +5,32 @@ import android.util.Log
 import android.util.Patterns
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.customview.customView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okhttp3.Cookie
 import okhttp3.HttpUrl
+import org.apache.commons.text.StringEscapeUtils
 import ru.rofleksey.animewatcher.api.model.Quality
 import ru.rofleksey.animewatcher.util.AnimeUtils.Companion.USER_AGENT
 import java.io.IOException
 import java.io.UnsupportedEncodingException
+import java.net.URI
 import java.nio.charset.Charset
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+
 class ApiUtil {
     companion object {
 
         private val CLOUDFLARE_TAG = "CloudflareBypass"
-        private const val BYPASS_TIMEOUT_DEFAULT = 15000L
+        private const val BYPASS_TIMEOUT_DEFAULT = 45000L
         private const val CLOUDFLARE_TIME_THRESHOLD = 1000 * 120 * 10
         private val URL_REGEX = Patterns.WEB_URL.toRegex()
 
@@ -87,7 +92,7 @@ class ApiUtil {
             title: String,
             cookieHost: String,
             timeThreshold: Int = CLOUDFLARE_TIME_THRESHOLD,
-            clearCookies: Boolean = true
+            clearCookies: Boolean = false
         ) {
             val prefs = context.getSharedPreferences("cloudflare", Context.MODE_PRIVATE)
             val lastTime = prefs.getLong(cookieHost, 0)
@@ -102,7 +107,10 @@ class ApiUtil {
             Log.v(CLOUDFLARE_TAG, "bypassing...")
             val result: MutableList<Cookie> = mutableListOf()
             withContext(Dispatchers.Main) {
-                val webWrapper = WebViewWrapper.with(context, clearCookies)
+                val webWrapper = WebViewWrapper.with(context, clearCookies, false)
+                val dialog = MaterialDialog(context).show {
+                    customView(view = webWrapper.webView, scrollable = true)
+                }
                 withTimeout(BYPASS_TIMEOUT_DEFAULT) {
                     suspendCancellableCoroutine<Unit> { cont ->
                         webWrapper.webView.webViewClient = object : WebViewClient() {
@@ -129,14 +137,71 @@ class ApiUtil {
                         webWrapper.webView.loadUrl(url.toString(), headers)
                         cont.invokeOnCancellation {
                             webWrapper.destroy()
+                            dialog.dismiss()
                         }
                     }
+                    dialog.dismiss()
                     webWrapper.destroy()
                 }
             }
             HttpHandler.instance.saveCookies(url, result)
             prefs.edit().putLong(cookieHost, curTime).apply()
             Log.v(CLOUDFLARE_TAG, "Bypass OK")
+        }
+
+        fun getHost(url: String): String? {
+            val uri = URI(url)
+            val hostname = uri.host
+            if (hostname != null) {
+                return if (hostname.startsWith("www.")) hostname.substring(4) else hostname
+            }
+            return null
+        }
+
+        suspend fun <T> puppeteerPage(
+            context: Context,
+            link: HttpUrl,
+            headers: Map<String, String>?,
+            func: (String) -> T
+        ): T {
+            return withContext(Dispatchers.Main) {
+                val webWrapper = WebViewWrapper.with(context, false, true)
+                withTimeout(BYPASS_TIMEOUT_DEFAULT) {
+                    val result = suspendCancellableCoroutine<String> { cont ->
+                        webWrapper.webView.webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView, url: String?) {
+                                try {
+                                    view.evaluateJavascript(
+                                        "(function() { return ('<html>'+document.getElementsByTagName('html')[0].innerHTML+'</html>'); })();"
+                                    ) { html ->
+                                        val unescaped = StringEscapeUtils.unescapeJava(html)
+                                        Log.d("puppeteer", "puppeteerPage: $unescaped")
+                                        cont.resume(unescaped)
+                                    }
+                                } catch (e: Throwable) {
+                                    cont.resumeWithException(e)
+                                }
+                            }
+                        }
+                        val webHeaders = HashMap<String, String>()
+                        webHeaders["X-Requested-With"] = ""
+                        webHeaders["User-Agent"] = USER_AGENT
+                        headers?.entries?.forEach { entry ->
+                            webHeaders[entry.key] = entry.value
+                        }
+                        webWrapper.webView.loadUrl(link.toString(), webHeaders)
+                        cont.invokeOnCancellation {
+                            webWrapper.destroy()
+                        }
+                    }
+                    HttpHandler.instance.saveCookies(
+                        link,
+                        webWrapper.getCookies(link.toString(), getHost(link.toString()) ?: "")
+                    )
+                    webWrapper.destroy()
+                    func(result)
+                }
+            }
         }
     }
 }

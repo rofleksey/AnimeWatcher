@@ -13,15 +13,17 @@ class WebViewWrapper private constructor(val webView: WebView) {
     companion object {
         private const val TAG = "WebViewWrapper"
 
-        fun with(context: Context, clearCookies: Boolean): WebViewWrapper {
+        fun with(context: Context, clearCookies: Boolean, invisible: Boolean): WebViewWrapper {
             val webView = WebView(context)
-            webView.setWillNotDraw(true)
+            if (invisible) {
+                webView.setWillNotDraw(true)
+            }
             if (clearCookies) {
                 CookieManager.getInstance().removeAllCookies(ValueCallback {
 
                 })
+                webView.clearCache(false)
             }
-            webView.clearCache(false)
             with(webView.settings) {
                 javaScriptEnabled = true
                 javaScriptCanOpenWindowsAutomatically = true
